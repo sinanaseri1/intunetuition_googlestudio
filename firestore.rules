@@ -1,0 +1,239 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: userId
+    // Fields:
+    //   - email: string (required)
+    //   - name: string (required)
+    //   - role: string (required, 'student' | 'teacher' | 'admin')
+    //   - createdAt: string (required)
+    //   - updatedAt: string (required)
+    //
+    // Collection: students
+    // Document ID: userId
+    // Fields:
+    //   - userId: string (required)
+    //   - creditsRemaining: number (required)
+    //   - packageHistory: list (required)
+    //
+    // Collection: teachers
+    // Document ID: userId
+    // Fields:
+    //   - userId: string (required)
+    //   - bio: string (required)
+    //   - instrumentSpecialties: list (required)
+    //
+    // Collection: packages
+    // Document ID: packageId
+    // Fields:
+    //   - name: string (required)
+    //   - priceGbp: number (required)
+    //   - lessons: number (required)
+    //   - groupSize: string (required)
+    //   - description: string (required)
+    //   - stripePriceId: string (optional)
+    //   - isActive: boolean (required)
+    //   - createdAt: string (required)
+    //
+    // Collection: lessonSlots
+    // Document ID: lessonSlotId
+    // Fields:
+    //   - startTime: string (required)
+    //   - endTime: string (required)
+    //   - teacherId: string (required)
+    //   - location: string (required)
+    //   - maxStudents: number (required)
+    //   - isCancelled: boolean (required)
+    //   - createdAt: string (required)
+    //
+    // Collection: bookings
+    // Document ID: bookingId
+    // Fields:
+    //   - studentId: string (required)
+    //   - lessonSlotId: string (required)
+    //   - status: string (required, 'booked' | 'completed' | 'cancelled' | 'no_show')
+    //   - feedbackRating: number (optional)
+    //   - feedbackComment: string (optional)
+    //   - bookedAt: string (required)
+    //   - updatedAt: string (required)
+    //
+    // Collection: teacherNotes
+    // Document ID: noteId
+    // Fields:
+    //   - bookingId: string (required)
+    //   - noteText: string (required)
+    //   - createdAt: string (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+        (request.auth.token.email == "naseri.sina007@gmail.com" && request.auth.token.email_verified == true));
+    }
+    
+    function isTeacher() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'teacher';
+    }
+    
+    function isStudent() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'student';
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+    
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidDateString(dateStr) {
+      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return hasRequiredFields(['email', 'name', 'role', 'createdAt', 'updatedAt']) &&
+             data.email is string && isValidEmail(data.email) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.role in ['student', 'teacher', 'admin'] &&
+             isValidDateString(data.createdAt) &&
+             isValidDateString(data.updatedAt);
+    }
+
+    function isValidStudent(data) {
+      return hasRequiredFields(['userId', 'creditsRemaining', 'packageHistory']) &&
+             data.userId is string &&
+             data.creditsRemaining is number && data.creditsRemaining >= 0 &&
+             data.packageHistory is list;
+    }
+
+    function isValidTeacher(data) {
+      return hasRequiredFields(['userId', 'bio', 'instrumentSpecialties']) &&
+             data.userId is string &&
+             data.bio is string && data.bio.size() < 2000 &&
+             data.instrumentSpecialties is list;
+    }
+
+    function isValidPackage(data) {
+      return hasRequiredFields(['name', 'priceGbp', 'lessons', 'groupSize', 'description', 'isActive', 'createdAt']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.priceGbp is number && data.priceGbp >= 0 &&
+             data.lessons is number && data.lessons > 0 &&
+             data.groupSize is string && data.groupSize.size() < 50 &&
+             data.description is string && data.description.size() < 1000 &&
+             data.isActive is bool &&
+             isValidDateString(data.createdAt);
+    }
+
+    function isValidLessonSlot(data) {
+      return hasRequiredFields(['startTime', 'endTime', 'teacherId', 'location', 'maxStudents', 'isCancelled', 'createdAt']) &&
+             isValidDateString(data.startTime) &&
+             isValidDateString(data.endTime) &&
+             data.teacherId is string &&
+             data.location is string && data.location.size() < 200 &&
+             data.maxStudents is number && data.maxStudents > 0 &&
+             data.isCancelled is bool &&
+             isValidDateString(data.createdAt);
+    }
+
+    function isValidBooking(data) {
+      return hasRequiredFields(['studentId', 'lessonSlotId', 'status', 'bookedAt', 'updatedAt']) &&
+             data.studentId is string &&
+             data.lessonSlotId is string &&
+             data.status in ['booked', 'completed', 'cancelled', 'no_show'] &&
+             isValidDateString(data.bookedAt) &&
+             isValidDateString(data.updatedAt);
+    }
+
+    function isValidTeacherNote(data) {
+      return hasRequiredFields(['bookingId', 'noteText', 'createdAt']) &&
+             data.bookingId is string &&
+             data.noteText is string && data.noteText.size() < 2000 &&
+             isValidDateString(data.createdAt);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isAuthenticated(); // Users need to see names of teachers/students
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && 
+                    ((request.resource.data.role == 'student') || isAdmin());
+      allow update: if isAuthenticated() && isValidUser(request.resource.data) && 
+                    ((isOwner(userId) && request.resource.data.role == resource.data.role) || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    match /students/{studentId} {
+      allow read: if isOwner(studentId) || isAdmin() || isTeacher();
+      allow create: if (isOwner(studentId) || isAdmin()) && isValidStudent(request.resource.data) && request.resource.data.userId == studentId;
+      allow update: if isAdmin() && isValidStudent(request.resource.data) && request.resource.data.userId == resource.data.userId;
+      allow delete: if isAdmin();
+    }
+
+    match /teachers/{teacherId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() && isValidTeacher(request.resource.data) && request.resource.data.userId == teacherId;
+      allow update: if (isOwner(teacherId) || isAdmin()) && isValidTeacher(request.resource.data) && request.resource.data.userId == resource.data.userId;
+      allow delete: if isAdmin();
+    }
+
+    match /packages/{packageId} {
+      allow read: if true; // Publicly readable for the landing page
+      allow create: if isAdmin() && isValidPackage(request.resource.data);
+      allow update: if isAdmin() && isValidPackage(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /lessonSlots/{lessonSlotId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() && isValidLessonSlot(request.resource.data);
+      allow update: if isAdmin() && isValidLessonSlot(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /bookings/{bookingId} {
+      allow read: if isAuthenticated() && (isOwner(resource.data.studentId) || isAdmin() || isTeacher());
+      allow create: if isAuthenticated() && isValidBooking(request.resource.data) && 
+                    (isOwner(request.resource.data.studentId) || isAdmin());
+      allow update: if isAuthenticated() && isValidBooking(request.resource.data) && 
+                    (isOwner(resource.data.studentId) || isAdmin() || isTeacher()) &&
+                    request.resource.data.studentId == resource.data.studentId &&
+                    request.resource.data.lessonSlotId == resource.data.lessonSlotId;
+      allow delete: if isAdmin();
+    }
+
+    match /teacherNotes/{noteId} {
+      allow read: if isAdmin() || isTeacher();
+      allow create: if isTeacher() && isValidTeacherNote(request.resource.data);
+      allow update: if isTeacher() && isValidTeacherNote(request.resource.data);
+      allow delete: if isAdmin();
+    }
+  }
+}
