@@ -6,6 +6,8 @@ import { motion } from 'motion/react';
 import image1 from "../assets/image1.jpg";
 import image2 from "../assets/image2.jpg";
 import image3 from "../assets/image3.jpg";
+import image4 from "../assets/image4.jpg";
+
 
 export function Home() {
   return (
@@ -107,8 +109,9 @@ export function Home() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[
               { id: 1, src: image1, alt: "Description 1" },
-              { id: 2, src: image2, alt: "Description 2" },
+      //        { id: 2, src: image2, alt: "Description 2" },
               { id: 3, src: image3, alt: "Description 3" },
+              { id: 4, src: image4, alt: "Description 4" },
             ].map((img, index) => (
 
               <motion.div
