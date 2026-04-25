@@ -72,7 +72,7 @@ export function Layout() {
           <div>
             <h3 className="text-white font-semibold mb-4">Contact</h3>
             <ul className="space-y-2 text-sm">
-              <li>Email: hello@intunetuition.com</li>
+              <li>Email: Info@intunetuition.co.uk</li>
               <li>Phone: 01234 567890</li>
             </ul>
           </div>

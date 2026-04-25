@@ -150,7 +150,7 @@ export function Home() {
               {
                 id: 'basic',
                 name: 'Basic Plan',
-                price: '£40',
+                price: '£5.75',
                 interval: 'month',
                 description: 'Perfect for beginners getting started with acoustic guitar.',
                 features: [
@@ -164,7 +164,7 @@ export function Home() {
               {
                 id: 'pro',
                 name: 'Pro Plan',
-                price: '£75',
+                price: '£10.80',
                 interval: 'month',
                 description: 'For dedicated students who want to progress faster.',
                 features: [
@@ -179,7 +179,7 @@ export function Home() {
               {
                 id: 'intensive',
                 name: 'Intensive Plan',
-                price: '£140',
+                price: '£11.00',
                 interval: 'month',
                 description: 'Accelerated learning for serious musicians.',
                 features: [
