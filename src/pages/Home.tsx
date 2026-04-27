@@ -13,9 +13,9 @@ export function Home() {
   return (
     <div className="flex flex-col min-h-screen">
       {/* Hero Section */}
-      <section className="bg-[#b9d9a1] py-20 md:py-32 relative overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          <div className="max-w-2xl">
+      <section className="bg-[#b9d9a1] py-20 md:py-32">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 flex flex-col lg:flex-row items-center gap-8">
+          <div className="lg:flex-1">
             <h1 className="text-5xl md:text-7xl font-bold text-stone-900 tracking-tight leading-[1.1] mb-6">
               Discover the joy of playing guitar.
             </h1>
@@ -33,10 +33,14 @@ export function Home() {
               </Button>
             </div>
           </div>
-        </div>
-        {/* Decorative elements */}
-        <div className="absolute top-1/2 right-0 transform -translate-y-1/2 translate-x-1/3 opacity-20 hidden lg:block">
-          <Music className="w-96 h-96 text-stone-900" />
+          <div className="lg:flex-1 hidden lg:block">
+            <img 
+              src={image2} 
+              alt="Guitar lesson in action" 
+              className="w-full rounded-2xl shadow-lg"
+              referrerPolicy="no-referrer"
+            />
+          </div>
         </div>
       </section>
 
