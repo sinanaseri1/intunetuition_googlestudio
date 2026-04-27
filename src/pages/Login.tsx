@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
+import { db } from '../firebase';
+import { doc, getDoc } from 'firebase/firestore';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -21,7 +23,18 @@ export function Login() {
     if (user && profile && !loading) {
       if (profile.role === 'admin') navigate('/admin');
       else if (profile.role === 'teacher') navigate('/teacher');
-      else navigate('/dashboard');
+      else if (profile.role === 'student') {
+        // Check if student profile is complete
+        const checkProfile = async () => {
+          const studentDoc = await getDoc(doc(db, 'students', user.uid));
+          if (studentDoc.exists() && studentDoc.data().childName) {
+            navigate('/dashboard');
+          } else {
+            navigate('/student-profile');
+          }
+        };
+        checkProfile();
+      }
     }
   }, [user, profile, loading, navigate]);
 

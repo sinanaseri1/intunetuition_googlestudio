@@ -15,6 +15,9 @@ import { AdminDashboard } from './pages/AdminDashboard';
 import { Testimonials } from './pages/Testimonials';
 import { Contact } from './pages/Contact';
 import { Pricing } from './pages/Pricing';
+import { PrivacyPolicy } from './pages/PrivacyPolicy';
+import { Terms } from './pages/Terms';
+import { StudentProfile } from './pages/StudentProfile';
 
 function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode, allowedRoles?: string[] }) {
   const { user, profile, loading } = useAuth();
@@ -45,6 +48,9 @@ export default function App() {
             <Route path="testimonials" element={<Testimonials />} />
             <Route path="contact" element={<Contact />} />
             <Route path="pricing" element={<Pricing />} />
+            <Route path="privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="terms" element={<Terms />} />
+            <Route path="student-profile" element={<StudentProfile />} />
             
             <Route path="dashboard" element={
               <ProtectedRoute allowedRoles={['student']}>

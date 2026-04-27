@@ -69,9 +69,9 @@ export function Home() {
                 <Star className="w-8 h-8 text-[#b9d9a1]" />
               </div>
               <h3 className="text-xl font-semibold mb-3">Expert Tutors</h3>
-              <p className="text-stone-600">
-                Led by Joel, an experienced and fully DBS-checked tutor specializing in primary education.
-              </p>
+               <p className="text-stone-600">
+                 Led by Joel and Jack, experienced and fully DBS-checked tutors specializing in primary education.
+               </p>
             </div>
             <div className="text-center">
               <div className="bg-stone-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -150,53 +150,55 @@ export function Home() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto items-center py-8">
-            {[
-              {
-                id: 'basic',
-                name: 'Basic Plan',
-                price: '£5.75',
-                interval: 'month',
-                description: 'Perfect for beginners getting started with acoustic guitar.',
-                features: [
-                  '2 lessons per month',
-                  'Access to basic sheet music',
-                  'Email support',
-                  'Cancel anytime'
-                ],
-                popular: false
-              },
-              {
-                id: 'pro',
-                name: 'Pro Plan',
-                price: '£10.80',
-                interval: 'month',
-                description: 'For dedicated students who want to progress faster.',
-                features: [
-                  '4 lessons per month',
-                  'Access to all sheet music & tabs',
-                  'Priority booking',
-                  'Direct messaging with teacher',
-                  'Cancel anytime'
-                ],
-                popular: true
-              },
-              {
-                id: 'intensive',
-                name: 'Intensive Plan',
-                price: '£11.00',
-                interval: 'month',
-                description: 'Accelerated learning for serious musicians.',
-                features: [
-                  '8 lessons per month',
-                  'Full library access',
-                  'Priority booking',
-                  'Direct messaging with teacher',
-                  'Monthly progress review',
-                  'Cancel anytime'
-                ],
-                popular: false
-              }
-            ].map((plan) => (
+             {[
+               {
+                 id: 'basic',
+                 name: 'Basic Plan',
+                 price: '£33',
+                 interval: 'per term',
+                 description: '6 lessons - Groups of 4-6 children (£5.50 per lesson)',
+                 features: [
+                   '6 lessons per term',
+                   'Groups of 4-6 children',
+                   'Access to basic sheet music',
+                   'Email support',
+                   'Cancel anytime'
+                 ],
+                 popular: false
+               },
+               {
+                 id: 'standard',
+                 name: 'Standard Plan',
+                 price: '£58',
+                 interval: 'per term',
+                 description: '12 lessons - Groups of 4-6 children (£4.83 per lesson) SAVE £8',
+                 features: [
+                   '12 lessons per term',
+                   'Groups of 4-6 children',
+                   'Sibling discount available',
+                   'Access to all sheet music & tabs',
+                   'Priority booking',
+                   'Cancel anytime'
+                 ],
+                 popular: true
+               },
+               {
+                 id: 'premium',
+                 name: 'Premium Plan',
+                 price: '£54',
+                 interval: 'per term',
+                 description: '6 lessons - Groups of only 2 children (£9 per lesson)',
+                 features: [
+                   '6 lessons per term',
+                   'Groups of only 2 children',
+                   'Full library access',
+                   'Direct messaging with teacher',
+                   'Monthly progress review',
+                   'Cancel anytime'
+                 ],
+                 popular: false
+               }
+             ].map((plan) => (
               <Card
                 key={plan.id}
                 className={`flex flex-col relative overflow-visible bg-white ${plan.popular ? 'border-2 border-[#b9d9a1] shadow-xl shadow-[#b9d9a1]/20 md:scale-105 z-10' : 'border-stone-200'}`}

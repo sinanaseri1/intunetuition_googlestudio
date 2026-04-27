@@ -2,6 +2,7 @@ import { Outlet, Link } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { Button } from './ui/button';
 import { Logo } from './Logo';
+import { CookieConsent } from './CookieConsent';
 
 export function Layout() {
   const { user, profile, logout } = useAuth();
@@ -66,7 +67,9 @@ export function Layout() {
               <li><Link to="/pricing" className="hover:text-white">Pricing</Link></li>
               <li><Link to="/testimonials" className="hover:text-white">Testimonials</Link></li>
               <li><Link to="/contact" className="hover:text-white">Contact</Link></li>
-              <li><Link to="/login" className="hover:text-white">Student Login</Link></li>
+               <li><Link to="/login" className="hover:text-white">Student Login</Link></li>
+               <li><Link to="/privacy-policy" className="hover:text-white">Privacy Policy</Link></li>
+               <li><Link to="/terms" className="hover:text-white">Terms & Conditions</Link></li>
             </ul>
           </div>
           <div>
@@ -81,6 +84,7 @@ export function Layout() {
           &copy; {new Date().getFullYear()} In Tune Tuition. All rights reserved.
         </div>
       </footer>
+      <CookieConsent />
     </div>
   );
 }
