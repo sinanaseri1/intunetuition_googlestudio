@@ -21,6 +21,23 @@ export function Dashboard() {
   useEffect(() => {
     async function fetchData() {
       if (!user) return;
+      
+      // Check if student profile is complete
+      if (profile?.role === 'student') {
+        const studentDoc = await getDoc(doc(db, 'students', user.uid));
+        if (studentDoc.exists()) {
+          const data = studentDoc.data();
+          // If no childName, profile is incomplete
+          if (!data.childName) {
+            navigate('/student-profile');
+            return;
+          }
+        } else {
+          navigate('/student-profile');
+          return;
+        }
+      }
+      
       try {
         // Fetch student data
         const studentDoc = await getDoc(doc(db, 'students', user.uid));
@@ -96,6 +113,35 @@ export function Dashboard() {
           Book a Lesson
         </Button>
       </div>
+
+      {studentData?.childName && (
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle>Student Information</CardTitle>
+            <CardDescription>Your child's details on file</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-stone-500">Child's Name</p>
+                <p className="font-medium text-stone-900">{studentData.childName}</p>
+              </div>
+              <div>
+                <p className="text-sm text-stone-500">Year Group</p>
+                <p className="font-medium text-stone-900">{studentData.yearGroup}</p>
+              </div>
+              <div>
+                <p className="text-sm text-stone-500">School</p>
+                <p className="font-medium text-stone-900">{studentData.school}</p>
+              </div>
+              <div>
+                <p className="text-sm text-stone-500">Phone</p>
+                <p className="font-medium text-stone-900">{studentData.phone}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {/* Left Column: Stats & Packages */}

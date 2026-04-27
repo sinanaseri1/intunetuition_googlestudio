@@ -129,7 +129,14 @@ service cloud.firestore {
       return hasRequiredFields(['userId', 'creditsRemaining', 'packageHistory']) &&
              data.userId is string &&
              data.creditsRemaining is number && data.creditsRemaining >= 0 &&
-             data.packageHistory is list;
+             data.packageHistory is list &&
+             (data.childName == null || data.childName is string) &&
+             (data.yearGroup == null || data.yearGroup is string) &&
+             (data.school == null || data.school is string) &&
+             (data.phone == null || data.phone is string) &&
+             (data.gdprConsentGiven == null || data.gdprConsentGiven is bool) &&
+             (data.gdprConsentDate == null || isValidDateString(data.gdprConsentDate)) &&
+             (data.gdprConsentVersion == null || data.gdprConsentVersion is string);
     }
 
     function isValidTeacher(data) {
