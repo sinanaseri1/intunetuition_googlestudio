@@ -18,6 +18,10 @@ import { Pricing } from './pages/Pricing';
 import { PrivacyPolicy } from './pages/PrivacyPolicy';
 import { Terms } from './pages/Terms';
 import { StudentProfile } from './pages/StudentProfile';
+import { MyData } from './pages/MyData';
+import { EditProfile } from './pages/EditProfile';
+import { DeleteAccount } from './pages/DeleteAccount';
+import { ConsentFlow } from './pages/ConsentFlow';
 
 function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode, allowedRoles?: string[] }) {
   const { user, profile, loading } = useAuth();
@@ -51,6 +55,10 @@ export default function App() {
             <Route path="privacy-policy" element={<PrivacyPolicy />} />
             <Route path="terms" element={<Terms />} />
             <Route path="student-profile" element={<StudentProfile />} />
+            <Route path="my-data" element={<MyData />} />
+            <Route path="edit-profile" element={<EditProfile />} />
+            <Route path="delete-account" element={<DeleteAccount />} />
+            <Route path="consent" element={<ConsentFlow />} />
             
             <Route path="dashboard" element={
               <ProtectedRoute allowedRoles={['student']}>

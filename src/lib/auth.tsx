@@ -47,6 +47,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const finalProfile = await runTransaction(db, async (transaction) => {
             const userDocRef = doc(db, 'users', firebaseUser.uid);
             const userDoc = await transaction.get(userDocRef);
+            const studentDocRef = doc(db, 'students', firebaseUser.uid);
+            const studentDoc = await transaction.get(studentDocRef);
             
             if (userDoc.exists()) {
               const data = userDoc.data() as UserProfile;
@@ -54,6 +56,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               if (firebaseUser.email === 'naseri.sina007@gmail.com' && data.role !== 'admin') {
                 data.role = 'admin';
                 transaction.set(userDocRef, { role: 'admin' }, { merge: true });
+              }
+              // Ensure students document exists for every user
+              if (!studentDoc.exists()) {
+                transaction.set(studentDocRef, {
+                  userId: firebaseUser.uid,
+                  creditsRemaining: 0,
+                  packageHistory: []
+                });
               }
               return data;
             } else {
@@ -67,9 +77,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 updatedAt: new Date().toISOString(),
               };
               transaction.set(userDocRef, newProfile);
-              
-              // Also create the student record for everyone (even admins might want to take lessons)
-              const studentDocRef = doc(db, 'students', firebaseUser.uid);
               transaction.set(studentDocRef, {
                 userId: firebaseUser.uid,
                 creditsRemaining: 0,
@@ -105,28 +112,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     await updateProfile(userCredential.user, { displayName: name });
     
-    // We explicitly write the full document here to ensure it passes Firestore security rules
-    // regardless of whether onAuthStateChanged has already created the document or not.
-    // The transaction in onAuthStateChanged will handle concurrent writes safely.
-    const role = email === 'naseri.sina007@gmail.com' ? 'admin' : 'student';
-    const now = new Date().toISOString();
-    const newProfile: UserProfile = {
-      email: email,
-      name: name,
-      role: role,
-      createdAt: now,
-      updatedAt: now,
-    };
+    // onAuthStateChanged creates the users and students documents.
+    // We update the users document with the correct name here since onAuthStateChanged
+    // fires before updateProfile completes, so it gets 'New User' initially.
+    await new Promise<void>((resolve) => {
+      const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+        if (firebaseUser && firebaseUser.uid === userCredential.user.uid) {
+          unsubscribe();
+          resolve();
+        }
+      });
+    });
     
-    await setDoc(doc(db, 'users', userCredential.user.uid), newProfile);
-    await setDoc(doc(db, 'students', userCredential.user.uid), {
-      userId: userCredential.user.uid,
-      creditsRemaining: 0,
-      packageHistory: []
-    }, { merge: true });
-    
-    // Update the local profile state so the UI reflects the correct name immediately
-    setProfile(newProfile);
+    // Update the name that onAuthStateChanged set to 'New User'
+    await setDoc(doc(db, 'users', userCredential.user.uid), { name }, { merge: true });
+    setProfile((prev) => prev ? { ...prev, name } : prev);
   };
 
   const logout = async () => {
