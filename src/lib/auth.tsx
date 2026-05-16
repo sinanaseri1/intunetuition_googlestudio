@@ -52,11 +52,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             
             if (userDoc.exists()) {
               const data = userDoc.data() as UserProfile;
-              // Auto-upgrade the designated admin email if they aren't already an admin
-              if (firebaseUser.email === 'naseri.sina007@gmail.com' && data.role !== 'admin') {
-                data.role = 'admin';
-                transaction.set(userDocRef, { role: 'admin' }, { merge: true });
-              }
               // Ensure students document exists for every user
               if (!studentDoc.exists()) {
                 transaction.set(studentDocRef, {
@@ -68,7 +63,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               return data;
             } else {
               // Create a new profile, assigning admin role if it's the designated admin email
-              const role = firebaseUser.email === 'naseri.sina007@gmail.com' ? 'admin' : 'student';
+          const adminEmail = import.meta.env.VITE_ADMIN_EMAIL || '';
+              const role: UserRole = firebaseUser.email === adminEmail ? 'admin' : 'student';
               const newProfile: UserProfile = {
                 email: firebaseUser.email || '',
                 name: firebaseUser.displayName || 'New User',

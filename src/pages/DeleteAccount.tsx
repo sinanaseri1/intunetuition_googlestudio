@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../lib/auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Checkbox } from '../components/ui/checkbox';
@@ -7,6 +8,7 @@ import { Label } from '../components/ui/label';
 import { AlertTriangle, CheckCircle2, AlertCircle } from 'lucide-react';
 
 export function DeleteAccount() {
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [confirmed, setConfirmed] = useState(false);
   const [reason, setReason] = useState('');
@@ -23,13 +25,21 @@ export function DeleteAccount() {
       return;
     }
 
+    if (!user) {
+      setError('You must be logged in to request account anonymization');
+      return;
+    }
+
     setLoading(true);
     try {
+      const token = await user.getIdToken();
       const response = await fetch('/api/anonymize-account', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
         },
+        body: JSON.stringify({ reason }),
       });
 
       const data = await response.json();
