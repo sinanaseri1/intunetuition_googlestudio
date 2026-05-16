@@ -73,6 +73,8 @@ export const checkoutSchema = z.object({
   studentId: z.string().min(1, 'studentId is required'),
   packageId: z.string().optional(),
   credits: z.union([z.string(), z.number()]).optional(),
+  location: z.string().optional(),
+  planName: z.string().optional(),
 });
 
 export const subscriptionSchema = z.object({

@@ -62,7 +62,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
-        const { studentId, packageId, credits, planName } = session.metadata || {};
+        const { studentId, packageId, credits, location, planName } = session.metadata || {};
 
         if (studentId) {
           const studentDocRef = doc(db, 'students', studentId);
@@ -80,15 +80,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             if (packageId) {
               updates.packageHistory = arrayUnion({
                 packageId,
+                location: location || '',
+                planName: planName || '',
+                credits: creditAmount,
                 purchasedAt: new Date().toISOString(),
                 sessionId: session.id,
+                amountTotal: session.amount_total ? session.amount_total / 100 : null,
               });
             }
             await updateDoc(studentDocRef, updates as any);
           }
         }
 
-        console.log(`Checkout session completed: ${session.id}`, { studentId, packageId, credits, planName });
+        console.log(`Checkout session completed: ${session.id}`, { studentId, packageId, credits, location, planName });
         break;
       }
 

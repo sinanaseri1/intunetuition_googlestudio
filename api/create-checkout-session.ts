@@ -19,7 +19,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return safeJsonResponse(res, 400, { error: validation.error.errors[0]?.message || 'Invalid input' });
     }
 
-    const { priceId, studentId, packageId, credits } = validation.data;
+    const { priceId, studentId, packageId, credits, location, planName } = validation.data;
 
     if (!process.env.STRIPE_SECRET_KEY) {
       return safeJsonResponse(res, 500, { error: 'Payment processing not configured' });
@@ -42,6 +42,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         studentId,
         packageId: packageId || '',
         credits: credits?.toString() || '',
+        location: location || '',
+        planName: planName || '',
       },
     });
 
