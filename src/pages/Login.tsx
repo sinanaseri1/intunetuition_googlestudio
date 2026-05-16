@@ -20,22 +20,38 @@ export function Login() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (user && profile && !loading) {
-      if (profile.role === 'admin') navigate('/admin');
-      else if (profile.role === 'teacher') navigate('/teacher');
-      else if (profile.role === 'student') {
-        // Check if student profile is complete
-        const checkProfile = async () => {
-          const studentDoc = await getDoc(doc(db, 'students', user.uid));
-          if (studentDoc.exists() && studentDoc.data().childName) {
-            navigate('/dashboard');
+    let mounted = true;
+
+    async function redirectBasedOnProfile() {
+      if (!user || !profile) return;
+
+      if (profile.role === 'admin') {
+        navigate('/admin', { replace: true });
+      } else if (profile.role === 'teacher') {
+        navigate('/teacher', { replace: true });
+      } else if (profile.role === 'student') {
+        const studentDoc = await getDoc(doc(db, 'students', user.uid));
+        if (!mounted) return;
+        if (studentDoc.exists()) {
+          const data = studentDoc.data();
+          if (!data.childName) {
+            navigate('/student-profile', { replace: true });
+          } else if (!data.gdprConsentGiven) {
+            navigate('/consent', { replace: true });
           } else {
-            navigate('/student-profile');
+            navigate('/dashboard', { replace: true });
           }
-        };
-        checkProfile();
+        } else {
+          navigate('/student-profile', { replace: true });
+        }
       }
     }
+
+    if (user && profile && !loading) {
+      redirectBasedOnProfile();
+    }
+
+    return () => { mounted = false; };
   }, [user, profile, loading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {

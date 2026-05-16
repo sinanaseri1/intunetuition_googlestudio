@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../lib/auth';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, doc, getDoc, orderBy, Timestamp } from 'firebase/firestore';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Calendar, Clock, MapPin, Music, Star, CheckCircle2 } from 'lucide-react';
@@ -19,15 +19,25 @@ export function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let mounted = true;
+
     async function fetchData() {
-      if (!user) return;
+      if (!user || !profile) {
+        // Auth state isn't ready yet — wait briefly then check again
+        await new Promise(resolve => setTimeout(resolve, 300));
+        if (!mounted) return;
+        // If still not ready, stop loading to avoid infinite spinner
+        if (!user || !profile) {
+          setLoading(false);
+          return;
+        }
+      }
       
       // Check if student profile is complete
       if (profile?.role === 'student') {
         const studentDoc = await getDoc(doc(db, 'students', user.uid));
         if (studentDoc.exists()) {
           const data = studentDoc.data();
-          // If no childName, profile is incomplete
           if (!data.childName) {
             navigate('/student-profile');
             return;
@@ -39,13 +49,11 @@ export function Dashboard() {
       }
       
       try {
-        // Fetch student data
         const studentDoc = await getDoc(doc(db, 'students', user.uid));
         if (studentDoc.exists()) {
           setStudentData(studentDoc.data());
         }
 
-        // Fetch bookings
         const bookingsQuery = query(
           collection(db, 'bookings'),
           where('studentId', '==', user.uid)
@@ -54,7 +62,6 @@ export function Dashboard() {
         
         const bookings = await Promise.all(bookingsSnapshot.docs.map(async (bookingDoc) => {
           const bookingData = bookingDoc.data() as any;
-          // Fetch associated lesson slot
           const slotDoc = await getDoc(doc(db, 'lessonSlots', bookingData.lessonSlotId));
           const slotData = slotDoc.exists() ? slotDoc.data() : null;
           
@@ -68,9 +75,8 @@ export function Dashboard() {
         const now = new Date().toISOString();
         
         const upcoming = bookings.filter(b => b.slot && b.slot.startTime > now && b.status === 'booked');
-        const past = bookings.filter(b => b.slot && b.slot.startTime <= now || b.status !== 'booked');
+        const past = bookings.filter(b => (b.slot && b.slot.startTime <= now) || (b.status !== 'booked' && b.slot));
 
-        // Sort
         upcoming.sort((a, b) => a.slot.startTime.localeCompare(b.slot.startTime));
         past.sort((a, b) => b.slot.startTime.localeCompare(a.slot.startTime));
 
@@ -79,12 +85,13 @@ export function Dashboard() {
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
       } finally {
-        setLoading(false);
+        if (mounted) setLoading(false);
       }
     }
 
     fetchData();
-  }, [user]);
+    return () => { mounted = false; };
+  }, [user, profile, navigate]);
 
   if (loading) {
     return <div className="p-8 text-center">Loading your dashboard...</div>;
@@ -140,6 +147,14 @@ export function Dashboard() {
               </div>
             </div>
           </CardContent>
+          <CardFooter className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => navigate('/edit-profile')}>
+              Edit Profile
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => navigate('/my-data')}>
+              View My Data
+            </Button>
+          </CardFooter>
         </Card>
       )}
 
@@ -163,6 +178,38 @@ export function Dashboard() {
               >
                 Get a Subscription
               </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="border-red-200">
+            <CardHeader>
+              <CardTitle className="text-red-700">Account Management</CardTitle>
+              <CardDescription className="text-stone-500">Manage your data and privacy settings</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Button 
+                variant="outline" 
+                className="w-full justify-start"
+                onClick={() => navigate('/my-data')}
+              >
+                View & Export My Data
+              </Button>
+              <Button 
+                variant="outline" 
+                className="w-full justify-start"
+                onClick={() => navigate('/edit-profile')}
+              >
+                Edit Student Information
+              </Button>
+              <div className="pt-2 border-t border-stone-700">
+                <Button 
+                  variant="ghost" 
+                  className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
+                  onClick={() => navigate('/delete-account')}
+                >
+                  Request Account Anonymization
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>

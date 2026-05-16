@@ -22,7 +22,10 @@ export function Layout() {
               <Link to="/testimonials" className="text-sm font-medium text-stone-600 hover:text-stone-900">Testimonials</Link>
               <Link to="/contact" className="text-sm font-medium text-stone-600 hover:text-stone-900">Contact</Link>
               {profile?.role === 'student' && (
-                <Link to="/dashboard" className="text-sm font-medium text-stone-600 hover:text-stone-900">Dashboard</Link>
+                <>
+                  <Link to="/dashboard" className="text-sm font-medium text-stone-600 hover:text-stone-900">Dashboard</Link>
+                  <Link to="/my-data" className="text-sm font-medium text-stone-600 hover:text-stone-900">My Data</Link>
+                </>
               )}
               {profile?.role === 'teacher' && (
                 <Link to="/teacher" className="text-sm font-medium text-stone-600 hover:text-stone-900">Teacher Portal</Link>
@@ -70,6 +73,7 @@ export function Layout() {
                <li><Link to="/login" className="hover:text-white">Student Login</Link></li>
                <li><Link to="/privacy-policy" className="hover:text-white">Privacy Policy</Link></li>
                <li><Link to="/terms" className="hover:text-white">Terms & Conditions</Link></li>
+               <li><Link to="/delete-account" className="hover:text-white">Delete Account</Link></li>
             </ul>
           </div>
           <div>

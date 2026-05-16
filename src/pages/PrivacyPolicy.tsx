@@ -74,23 +74,51 @@ export function PrivacyPolicy() {
               <section className="mb-8">
                 <h2 className="text-2xl font-semibold mb-4">Your Rights Under GDPR</h2>
                 <p className="text-stone-700 leading-relaxed mb-4">
-                  Under the General Data Protection Regulation (GDPR), you have the following rights:
+                  Under the UK General Data Protection Regulation (UK GDPR), you have the following rights:
                 </p>
-                <ul className="list-disc list-inside space-y-1 text-stone-700">
-                  <li>Right to access your personal data</li>
-                  <li>Right to rectification of inaccurate data</li>
-                  <li>Right to erasure ("right to be forgotten")</li>
-                  <li>Right to restrict processing</li>
-                  <li>Right to data portability</li>
-                  <li>Right to object to processing</li>
-                  <li>Right to withdraw consent at any time</li>
+                <ul className="list-disc list-inside space-y-2 text-stone-700">
+                  <li><strong>Right of Access:</strong> You can request a copy of all personal data we hold about you by using the "View My Data" feature in your account dashboard.</li>
+                  <li><strong>Right to Rectification:</strong> You can update your personal information at any time through the "Edit Profile" feature in your account.</li>
+                  <li><strong>Right to Erasure:</strong> You can request the anonymization of your account at any time through the "Request Account Anonymization" feature. Your data will be anonymized rather than permanently deleted to maintain service records.</li>
+                  <li><strong>Right to Portability:</strong> You can export your data in JSON format using the "Download JSON" button in your account dashboard.</li>
+                  <li><strong>Right to Object:</strong> You can object to the processing of your data by contacting us at info@intunetuition.co.uk.</li>
+                  <li><strong>Right to Withdraw Consent:</strong> You can withdraw your GDPR consent at any time by contacting us. Note: This may affect our ability to provide services to you.</li>
                 </ul>
+                <p className="text-stone-700 leading-relaxed mt-4">
+                  To exercise any of these rights, please contact us at{' '}
+                  <a href="mailto:info@intunetuition.co.uk" className="text-[#b9d9a1] hover:underline">info@intunetuition.co.uk</a>.
+                  We will respond to your request within one month.
+                </p>
               </section>
 
               <section className="mb-8">
                 <h2 className="text-2xl font-semibold mb-4">Data Retention</h2>
                 <p className="text-stone-700 leading-relaxed">
-                  We retain your personal information for as long as necessary to fulfil the purposes for which it was collected, including any legal, accounting, or reporting requirements. You may request deletion of your data at any time by contacting us.
+                  We retain your personal information for as long as necessary to fulfil the purposes for which it was collected, including any legal, accounting, or reporting requirements.
+                </p>
+                <p className="text-stone-700 leading-relaxed mt-3">
+                  <strong>Automatic Deletion Policy:</strong> If you do not log in to your account for a period of 3 years, your account will be automatically anonymized. This means your personal data will be replaced with anonymized values while your booking history is retained in anonymized form for our records. You will receive an email notification before this process takes place.
+                </p>
+                <p className="text-stone-700 leading-relaxed mt-3">
+                  You may request deletion of your data at any time by contacting us at{' '}
+                  <a href="mailto:info@intunetuition.co.uk" className="text-[#b9d9a1] hover:underline">info@intunetuition.co.uk</a>.
+                </p>
+              </section>
+
+              <section className="mb-8">
+                <h2 className="text-2xl font-semibold mb-4">Account Anonymization</h2>
+                <p className="text-stone-700 leading-relaxed mb-4">
+                  When you request account deletion or your account is automatically anonymized after 3 years of inactivity, the following process occurs:
+                </p>
+                <ul className="list-disc list-inside space-y-1 text-stone-700">
+                  <li>Your name is replaced with "[DELETED]"</li>
+                  <li>Your email is changed to an anonymous address (e.g., anonymized_abc123@anonymized.local)</li>
+                  <li>Your child's name, school, and year group are removed</li>
+                  <li>Your phone number is removed</li>
+                  <li>Your login access is disabled</li>
+                </ul>
+                <p className="text-stone-700 leading-relaxed mt-4">
+                  <strong>Retained (Anonymized) Data:</strong> Your booking history and attendance records are kept in anonymized form for statistical and service improvement purposes. This data cannot be linked back to you personally.
                 </p>
               </section>
 

@@ -8,7 +8,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
-import { Users, BookOpen, Calendar, Settings, Plus, Edit, Trash2 } from 'lucide-react';
+import { Users, BookOpen, Calendar, Settings, Plus, Edit, Trash2, Shield, Download, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 
 export function AdminDashboard() {
@@ -139,6 +139,7 @@ export function AdminDashboard() {
           <TabsTrigger value="schedule" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">Schedule</TabsTrigger>
           <TabsTrigger value="students" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">Students</TabsTrigger>
           <TabsTrigger value="users" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">Users & Roles</TabsTrigger>
+          <TabsTrigger value="gdpr" className="data-[state=active]:bg-white data-[state=active]:shadow-sm">GDPR</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">
@@ -381,7 +382,7 @@ export function AdminDashboard() {
             </CardContent>
           </Card>
         </TabsContent>
-        <TabsContent value="users">
+          <TabsContent value="users">
           <Card>
             <CardHeader>
               <CardTitle>User Management</CardTitle>
@@ -404,14 +405,14 @@ export function AdminDashboard() {
                       <TableCell>{u.email}</TableCell>
                       <TableCell>
                         <span className={`inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize
-                          ${u.role === 'admin' ? 'bg-purple-100 text-purple-800' : 
-                            u.role === 'teacher' ? 'bg-blue-100 text-blue-800' : 
+                          ${u.role === 'admin' ? 'bg-purple-100 text-purple-800' :
+                            u.role === 'teacher' ? 'bg-blue-100 text-blue-800' :
                             'bg-stone-100 text-stone-800'}`}>
                           {u.role}
                         </span>
                       </TableCell>
                       <TableCell>
-                        <select 
+                        <select
                           className="flex h-8 w-[130px] rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                           value={u.role}
                           onChange={(e) => handleRoleChange(u.id, e.target.value)}
@@ -428,6 +429,129 @@ export function AdminDashboard() {
               </Table>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="gdpr">
+          <div className="space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-stone-500">Users Without Consent</CardTitle>
+                  <Shield className="w-4 h-4 text-stone-400" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-stone-900">
+                    {students.filter(s => !s.details?.gdprConsentGiven).length}
+                  </div>
+                  <p className="text-xs text-stone-500 mt-1">Need to provide GDPR consent</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-stone-500">Total Users</CardTitle>
+                  <Users className="w-4 h-4 text-stone-400" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-stone-900">{allUsers.length}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-stone-500">Consent Given</CardTitle>
+                  <Shield className="w-4 h-4 text-green-400" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-stone-900">
+                    {students.filter(s => s.details?.gdprConsentGiven).length}
+                  </div>
+                  <p className="text-xs text-stone-500 mt-1">of {students.length} students</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Users Requiring GDPR Consent</CardTitle>
+                <CardDescription>These users have not yet provided GDPR consent</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Parent Name</TableHead>
+                      <TableHead>Child's Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Signed Up</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {students.filter(s => !s.details?.gdprConsentGiven).length > 0 ? (
+                      students.filter(s => !s.details?.gdprConsentGiven).map(student => (
+                        <TableRow key={student.id}>
+                          <TableCell className="font-medium">{student.name}</TableCell>
+                          <TableCell>{student.details?.childName || 'N/A'}</TableCell>
+                          <TableCell>{student.email}</TableCell>
+                          <TableCell>{format(new Date(student.createdAt), 'MMM do, yyyy')}</TableCell>
+                          <TableCell>
+                            <Button variant="outline" size="sm" className="text-stone-600">
+                              Send Consent Reminder
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center py-8 text-stone-500">
+                          All users have provided GDPR consent
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-red-500" />
+                  Account Anonymization
+                </CardTitle>
+                <CardDescription>Manage account anonymization requests</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                  <p className="text-sm text-red-800">
+                    <strong>Note:</strong> Account anonymization replaces personal data with "[DELETED]" while retaining anonymized booking records for service statistics. This action cannot be undone.
+                  </p>
+                </div>
+                <Button variant="outline" className="text-red-600 border-red-200 hover:bg-red-50">
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  View Anonymization Queue
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Download className="h-5 w-5 text-stone-500" />
+                  Data Export
+                </CardTitle>
+                <CardDescription>Export user data for compliance or audit purposes</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-stone-600 mb-4">
+                  Export all user data in JSON format for ICO compliance requests or internal audits.
+                </p>
+                <Button className="bg-[#b9d9a1] text-stone-900 hover:bg-[#a5c58d]">
+                  <Download className="w-4 h-4 mr-2" />
+                  Export All Data (JSON)
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
     </div>
