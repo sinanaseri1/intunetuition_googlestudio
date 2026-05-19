@@ -1,12 +1,13 @@
 import { Link } from 'react-router-dom';
 import { Button } from '../components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/card';
-import { CheckCircle2, Music, Star, Users } from 'lucide-react';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../components/ui/card';
+import { Music, Star, Users } from 'lucide-react';
 import { motion } from 'motion/react';
 import image1 from "../assets/image1.jpg";
 import image2 from "../assets/image2.jpg";
 import image3 from "../assets/image3.jpg";
 import image4 from "../assets/image4.jpg";
+import guitarImage from "../assets/guitarImage.png";
 
 
 export function Home() {
@@ -150,55 +151,35 @@ export function Home() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto items-center py-8">
-             {[
-               {
-                 id: 'basic',
-                 name: 'Basic Plan',
-                 price: '£33',
-                 interval: 'per term',
-                 description: '6 lessons - Groups of 4-6 children (£5.50 per lesson)',
-                 features: [
-                   '6 lessons per term',
-                   'Groups of 4-6 children',
-                   'Access to basic sheet music',
-                   'Email support',
-                   'Cancel anytime'
-                 ],
-                 popular: false
-               },
-               {
-                 id: 'standard',
-                 name: 'Standard Plan',
-                 price: '£58',
-                 interval: 'per term',
-                 description: '12 lessons - Groups of 4-6 children (£4.83 per lesson) SAVE £8',
-                 features: [
-                   '12 lessons per term',
-                   'Groups of 4-6 children',
-                   'Sibling discount available',
-                   'Access to all sheet music & tabs',
-                   'Priority booking',
-                   'Cancel anytime'
-                 ],
-                 popular: true
-               },
-               {
-                 id: 'premium',
-                 name: 'Premium Plan',
-                 price: '£54',
-                 interval: 'per term',
-                 description: '6 lessons - Groups of only 2 children (£9 per lesson)',
-                 features: [
-                   '6 lessons per term',
-                   'Groups of only 2 children',
-                   'Full library access',
-                   'Direct messaging with teacher',
-                   'Monthly progress review',
-                   'Cancel anytime'
-                 ],
-                 popular: false
-               }
-             ].map((plan) => (
+              {[
+                {
+                  id: 'basic',
+                  name: 'Basic Plan',
+                  lessons: '7 lessons per term',
+                  duration: '20 min lessons',
+                  groupSize: 'Groups of 4-6 children',
+                  guitarsProvided: 'Guitars provided',
+                  popular: false
+                },
+                {
+                  id: 'standard',
+                  name: 'Standard Plan',
+                  lessons: '7 lessons per term',
+                  duration: '20 min lessons',
+                  groupSize: 'Groups of 4-6 children',
+                  guitarsProvided: 'Guitars provided',
+                  popular: true
+                },
+                {
+                  id: 'premium',
+                  name: 'Premium Plan',
+                  lessons: '7 lessons per term',
+                  duration: '20 min lessons',
+                  groupSize: 'Groups of 2 children',
+                  guitarsProvided: 'Guitars provided',
+                  popular: false
+                }
+              ].map((plan) => (
               <Card
                 key={plan.id}
                 className={`flex flex-col relative overflow-visible bg-white ${plan.popular ? 'border-2 border-[#b9d9a1] shadow-xl shadow-[#b9d9a1]/20 md:scale-105 z-10' : 'border-stone-200'}`}
@@ -212,21 +193,19 @@ export function Home() {
                 )}
                 <CardHeader className={plan.popular ? "pt-8" : ""}>
                   <CardTitle className="text-2xl">{plan.name}</CardTitle>
-                  <CardDescription className="min-h-[40px]">{plan.description}</CardDescription>
-                  <div className="mt-4 flex items-baseline text-4xl font-extrabold">
-                    {plan.price}
-                    <span className="ml-1 text-xl font-medium text-stone-500">/{plan.interval}</span>
+                  <div className="mt-4 space-y-2">
+                    <p className="text-stone-700 font-medium">{plan.lessons}</p>
+                    <p className="text-stone-600">{plan.duration}</p>
+                    <p className="text-stone-600">{plan.groupSize}</p>
+                    <p className="text-stone-600">{plan.guitarsProvided}</p>
                   </div>
                 </CardHeader>
-                <CardContent className="flex-1">
-                  <ul className="space-y-3">
-                    {plan.features.map((feature, index) => (
-                      <li key={index} className="flex items-start">
-                        <CheckCircle2 className="h-5 w-5 text-[#b9d9a1] shrink-0 mr-2" />
-                        <span className="text-stone-600">{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
+                <CardContent className="flex-1 flex items-center justify-center">
+                  <img
+                    src={guitarImage}
+                    alt="Guitar"
+                    className="w-full h-48 object-contain"
+                  />
                 </CardContent>
                 <CardFooter>
                   <Link to="/pricing" className="w-full">
