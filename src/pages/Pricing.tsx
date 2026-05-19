@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useAuth } from '../lib/auth';
 import { Button } from '../components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/card';
-import { CheckCircle2 } from 'lucide-react';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../components/ui/card';
+import guitarImage from '../assets/guitarImage.png';
 import { useNavigate } from 'react-router-dom';
 
 type LocationId = 'nottingham-derby' | 'leicester';
@@ -11,8 +11,10 @@ interface Package {
   id: string;
   name: string;
   price: string;
-  description: string;
-  features: string[];
+  lessons: string;
+  duration: string;
+  groupSize: string;
+  guitarsProvided: string;
   popular: boolean;
   priceId: string;
   credits: number;
@@ -28,48 +30,37 @@ const LOCATION_DATA: Record<LocationId, { label: string; dates: string; weeks: s
         id: 'standard',
         name: 'Standard',
         price: '£40.95',
-        description: '6 lessons - Groups of 4-6 children',
-        features: [
-          '6 lessons per term',
-          'Groups of 4-6 children',
-          'Access to basic sheet music',
-          'Email support',
-        ],
+        lessons: '7 lessons per term',
+        duration: '20 min lessons',
+        groupSize: 'Groups of 4-6 children',
+        guitarsProvided: 'Guitars provided',
         popular: false,
         priceId: 'price_1TXj8jDEUlJgtpZgNDKXHama',
-        credits: 6,
+        credits: 7,
       },
       {
         id: 'sibling',
         name: 'Sibling',
         price: '£75.95',
-        description: '12 lessons - Groups of 4-6 children',
-        features: [
-          '12 lessons per term',
-          'Groups of 4-6 children',
-          'Sibling sign up',
-          'Access to all sheet music & tabs',
-          'Priority booking',
-        ],
+        lessons: '7 lessons per term',
+        duration: '20 min lessons',
+        groupSize: 'Groups of 4-6 children',
+        guitarsProvided: 'Guitars provided',
         popular: true,
         priceId: 'price_1TXjCqDEUlJgtpZg4wTVeXWo',
-        credits: 12,
+        credits: 7,
       },
       {
         id: 'premium',
         name: 'Premium',
         price: '£77.00',
-        description: '6 lessons - Groups of only 2 children',
-        features: [
-          '6 lessons per term',
-          'Groups of only 2 children',
-          'Full library access',
-          'Direct messaging with teacher',
-          'Monthly progress review',
-        ],
+        lessons: '7 lessons per term',
+        duration: '20 min lessons',
+        groupSize: 'Groups of 2 children',
+        guitarsProvided: 'Guitars provided',
         popular: false,
         priceId: 'price_1TXjD7DEUlJgtpZgoLdKoJfw',
-        credits: 6,
+        credits: 7,
       },
     ],
   },
@@ -82,13 +73,10 @@ const LOCATION_DATA: Record<LocationId, { label: string; dates: string; weeks: s
         id: 'standard',
         name: 'Standard',
         price: '£29.25',
-        description: '6 lessons - Groups of 4-6 children',
-        features: [
-          '6 lessons per term',
-          'Groups of 4-6 children',
-          'Access to basic sheet music',
-          'Email support',
-        ],
+        lessons: '6 lessons per term',
+        duration: '20 min lessons',
+        groupSize: 'Groups of 4-6 children',
+        guitarsProvided: 'Guitars provided',
         popular: false,
         priceId: 'price_1TXjDSDEUlJgtpZgVOtCZzbR',
         credits: 6,
@@ -97,30 +85,22 @@ const LOCATION_DATA: Record<LocationId, { label: string; dates: string; weeks: s
         id: 'sibling',
         name: 'Sibling',
         price: '£54.25',
-        description: '12 lessons - Groups of 4-6 children',
-        features: [
-          '12 lessons per term',
-          'Groups of 4-6 children',
-          'Sibling sign up',
-          'Access to all sheet music & tabs',
-          'Priority booking',
-        ],
+        lessons: '6 lessons per term',
+        duration: '20 min lessons',
+        groupSize: 'Groups of 4-6 children',
+        guitarsProvided: 'Guitars provided',
         popular: true,
         priceId: 'price_1TXjF8DEUlJgtpZge3QFhAfT',
-        credits: 12,
+        credits: 6,
       },
       {
         id: 'premium',
         name: 'Premium',
         price: '£55.00',
-        description: '6 lessons - Groups of only 2 children',
-        features: [
-          '6 lessons per term',
-          'Groups of only 2 children',
-          'Full library access',
-          'Direct messaging with teacher',
-          'Monthly progress review',
-        ],
+        lessons: '6 lessons per term',
+        duration: '20 min lessons',
+        groupSize: 'Groups of 2 children',
+        guitarsProvided: 'Guitars provided',
         popular: false,
         priceId: 'price_1TXjFKDEUlJgtpZgndgUJLFC',
         credits: 6,
@@ -228,21 +208,23 @@ export function Pricing() {
               )}
               <CardHeader className={pkg.popular ? 'pt-8' : ''}>
                 <CardTitle className="text-2xl">{pkg.name}</CardTitle>
-                <CardDescription className="min-h-[40px]">{pkg.description}</CardDescription>
                 <div className="mt-4 flex items-baseline text-4xl font-extrabold">
                   {pkg.price}
                   <span className="ml-1 text-xl font-medium text-stone-500">/term</span>
                 </div>
+                <div className="mt-4 space-y-2">
+                  <p className="text-stone-700 font-medium">{pkg.lessons}</p>
+                  <p className="text-stone-600">{pkg.duration}</p>
+                  <p className="text-stone-600">{pkg.groupSize}</p>
+                  <p className="text-stone-600">{pkg.guitarsProvided}</p>
+                </div>
               </CardHeader>
-              <CardContent className="flex-1">
-                <ul className="space-y-3">
-                  {pkg.features.map((feature, index) => (
-                    <li key={index} className="flex items-start">
-                      <CheckCircle2 className="h-5 w-5 text-[#b9d9a1] shrink-0 mr-2" />
-                      <span className="text-stone-600">{feature}</span>
-                    </li>
-                  ))}
-                </ul>
+              <CardContent className="flex-1 flex items-center justify-center">
+                <img
+                  src={guitarImage}
+                  alt="Guitar"
+                  className="w-full h-48 object-contain"
+                />
               </CardContent>
               <CardFooter>
                 <Button

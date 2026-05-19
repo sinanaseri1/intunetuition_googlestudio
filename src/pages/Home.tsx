@@ -1,45 +1,47 @@
 import { Link } from 'react-router-dom';
 import { Button } from '../components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/card';
-import { CheckCircle2, Music, Star, Users } from 'lucide-react';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../components/ui/card';
+import { Music, Star, Users } from 'lucide-react';
 import { motion } from 'motion/react';
 import image1 from "../assets/image1.jpg";
 import image2 from "../assets/image2.jpg";
 import image3 from "../assets/image3.jpg";
 import image4 from "../assets/image4.jpg";
+import guitarImage from "../assets/guitarImage.png";
 
 
 export function Home() {
   return (
     <div className="flex flex-col min-h-screen">
       {/* Hero Section */}
-      <section className="bg-[#b9d9a1] py-20 md:py-32">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 flex flex-col lg:flex-row items-center gap-8">
-          <div className="lg:flex-1">
-            <h1 className="text-5xl md:text-7xl font-bold text-stone-900 tracking-tight leading-[1.1] mb-6">
+      <section className="relative py-20 md:py-32 overflow-hidden">
+        <div className="absolute inset-0">
+          <img 
+            src={image4} 
+            alt="Guitar lessons background" 
+            className="w-full h-full object-cover"
+            referrerPolicy="no-referrer"
+          />
+          <div className="absolute inset-0 bg-black/50" />
+        </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <div className="max-w-2xl">
+            <h1 className="text-5xl md:text-7xl font-bold text-white tracking-tight leading-[1.1] mb-6">
               Discover the joy of playing guitar.
             </h1>
-            <p className="text-xl text-stone-800 mb-8 max-w-xl leading-relaxed">
+            <p className="text-xl text-white/90 mb-8 leading-relaxed">
               In Tune Tuition provides engaging, high-quality acoustic guitar lessons for children in primary schools.
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
               <Link to="/login">
-                <Button size="lg" className="w-full sm:w-auto bg-stone-900 text-white hover:bg-stone-800 rounded-full px-8">
+                <Button size="lg" className="w-full sm:w-auto bg-white text-stone-900 hover:bg-white/90 rounded-full px-8">
                   Book Lessons
                 </Button>
               </Link>
-              <Button size="lg" variant="outline" className="w-full sm:w-auto rounded-full px-8 border-stone-900 text-stone-900 hover:bg-stone-900/5">
+              <Button size="lg" className="w-full sm:w-auto rounded-full px-8 border-2 border-white bg-transparent text-white hover:bg-white/10">
                 Learn More
               </Button>
             </div>
-          </div>
-          <div className="lg:flex-1 hidden lg:block">
-            <img 
-              src={image2} 
-              alt="Guitar lesson in action" 
-              className="w-full rounded-2xl shadow-lg"
-              referrerPolicy="no-referrer"
-            />
           </div>
         </div>
       </section>
@@ -112,10 +114,9 @@ export function Home() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[
-              { id: 1, src: image1, alt: "Description 1" },
-      //        { id: 2, src: image2, alt: "Description 2" },
-              { id: 3, src: image3, alt: "Description 3" },
-              { id: 4, src: image4, alt: "Description 4" },
+              { id: 1, src: image1, alt: "Students learning guitar together" },
+              { id: 2, src: image2, alt: "Guitar lesson in progress" },
+              { id: 3, src: image3, alt: "Group guitar practice" },
             ].map((img, index) => (
 
               <motion.div
@@ -150,55 +151,35 @@ export function Home() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto items-center py-8">
-             {[
-               {
-                 id: 'basic',
-                 name: 'Basic Plan',
-                 price: '£33',
-                 interval: 'per term',
-                 description: '6 lessons - Groups of 4-6 children (£5.50 per lesson)',
-                 features: [
-                   '6 lessons per term',
-                   'Groups of 4-6 children',
-                   'Access to basic sheet music',
-                   'Email support',
-                   'Cancel anytime'
-                 ],
-                 popular: false
-               },
-               {
-                 id: 'standard',
-                 name: 'Standard Plan',
-                 price: '£58',
-                 interval: 'per term',
-                 description: '12 lessons - Groups of 4-6 children (£4.83 per lesson) SAVE £8',
-                 features: [
-                   '12 lessons per term',
-                   'Groups of 4-6 children',
-                   'Sibling discount available',
-                   'Access to all sheet music & tabs',
-                   'Priority booking',
-                   'Cancel anytime'
-                 ],
-                 popular: true
-               },
-               {
-                 id: 'premium',
-                 name: 'Premium Plan',
-                 price: '£54',
-                 interval: 'per term',
-                 description: '6 lessons - Groups of only 2 children (£9 per lesson)',
-                 features: [
-                   '6 lessons per term',
-                   'Groups of only 2 children',
-                   'Full library access',
-                   'Direct messaging with teacher',
-                   'Monthly progress review',
-                   'Cancel anytime'
-                 ],
-                 popular: false
-               }
-             ].map((plan) => (
+              {[
+                {
+                  id: 'basic',
+                  name: 'Basic Plan',
+                  lessons: '7 lessons per term',
+                  duration: '20 min lessons',
+                  groupSize: 'Groups of 4-6 children',
+                  guitarsProvided: 'Guitars provided',
+                  popular: false
+                },
+                {
+                  id: 'standard',
+                  name: 'Standard Plan',
+                  lessons: '7 lessons per term',
+                  duration: '20 min lessons',
+                  groupSize: 'Groups of 4-6 children',
+                  guitarsProvided: 'Guitars provided',
+                  popular: true
+                },
+                {
+                  id: 'premium',
+                  name: 'Premium Plan',
+                  lessons: '7 lessons per term',
+                  duration: '20 min lessons',
+                  groupSize: 'Groups of 2 children',
+                  guitarsProvided: 'Guitars provided',
+                  popular: false
+                }
+              ].map((plan) => (
               <Card
                 key={plan.id}
                 className={`flex flex-col relative overflow-visible bg-white ${plan.popular ? 'border-2 border-[#b9d9a1] shadow-xl shadow-[#b9d9a1]/20 md:scale-105 z-10' : 'border-stone-200'}`}
@@ -212,21 +193,19 @@ export function Home() {
                 )}
                 <CardHeader className={plan.popular ? "pt-8" : ""}>
                   <CardTitle className="text-2xl">{plan.name}</CardTitle>
-                  <CardDescription className="min-h-[40px]">{plan.description}</CardDescription>
-                  <div className="mt-4 flex items-baseline text-4xl font-extrabold">
-                    {plan.price}
-                    <span className="ml-1 text-xl font-medium text-stone-500">/{plan.interval}</span>
+                  <div className="mt-4 space-y-2">
+                    <p className="text-stone-700 font-medium">{plan.lessons}</p>
+                    <p className="text-stone-600">{plan.duration}</p>
+                    <p className="text-stone-600">{plan.groupSize}</p>
+                    <p className="text-stone-600">{plan.guitarsProvided}</p>
                   </div>
                 </CardHeader>
-                <CardContent className="flex-1">
-                  <ul className="space-y-3">
-                    {plan.features.map((feature, index) => (
-                      <li key={index} className="flex items-start">
-                        <CheckCircle2 className="h-5 w-5 text-[#b9d9a1] shrink-0 mr-2" />
-                        <span className="text-stone-600">{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
+                <CardContent className="flex-1 flex items-center justify-center">
+                  <img
+                    src={guitarImage}
+                    alt="Guitar"
+                    className="w-full h-48 object-contain"
+                  />
                 </CardContent>
                 <CardFooter>
                   <Link to="/pricing" className="w-full">
