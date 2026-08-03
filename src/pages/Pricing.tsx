@@ -141,7 +141,7 @@ export function Pricing() {
               <CardHeader className={pkg.popular ? 'pt-8' : ''}>
                 <CardTitle className="text-2xl">{pkg.name}</CardTitle>
                 <div className="mt-4 flex items-baseline text-4xl font-extrabold">
-                  {formatPrice(pkg.pricePerLesson, activeTerm.lessons)}
+                  {formatPrice(activeTerm.prices[pkg.id])}
                   <span className="ml-1 text-xl font-medium text-stone-500">/term</span>
                 </div>
                 <div className="mt-4 space-y-2">

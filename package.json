@@ -10,6 +10,7 @@
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
     "prices": "tsx scripts/list-prices.ts",
+    "prices:create": "tsx scripts/create-prices.ts",
     "start": "node server.ts"
   },
   "dependencies": {
