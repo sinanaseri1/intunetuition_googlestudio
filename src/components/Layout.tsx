@@ -11,9 +11,9 @@ export function Layout() {
     <div className="min-h-screen flex flex-col bg-stone-50 text-stone-900 font-sans">
       <header className="bg-white border-b border-stone-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-20 items-center">
+          <div className="flex justify-between h-32 items-center">
             <Link to="/" className="flex items-center">
-              <Logo className="h-14 w-auto" />
+              <Logo className="h-28 w-auto" />
             </Link>
             
             <nav className="hidden md:flex items-center gap-6">
@@ -59,7 +59,7 @@ export function Layout() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-3 gap-8">
           <div>
             <div className="flex items-center mb-4 bg-white/5 p-2 rounded-lg inline-block">
-              <Logo className="h-12 w-auto filter grayscale brightness-200" />
+              <Logo className="h-24 w-auto" />
             </div>
             <p className="text-sm mt-2">Providing high-quality acoustic guitar lessons in primary schools.</p>
           </div>
@@ -70,7 +70,7 @@ export function Layout() {
               <li><Link to="/pricing" className="hover:text-white">Pricing</Link></li>
               <li><Link to="/testimonials" className="hover:text-white">Testimonials</Link></li>
               <li><Link to="/contact" className="hover:text-white">Contact</Link></li>
-               <li><Link to="/login" className="hover:text-white">Student Login</Link></li>
+               <li><Link to="/login" className="hover:text-white">Login</Link></li>
                <li><Link to="/privacy-policy" className="hover:text-white">Privacy Policy</Link></li>
                <li><Link to="/terms" className="hover:text-white">Terms & Conditions</Link></li>
                <li><Link to="/delete-account" className="hover:text-white">Delete Account</Link></li>
@@ -80,7 +80,6 @@ export function Layout() {
             <h3 className="text-white font-semibold mb-4">Contact</h3>
             <ul className="space-y-2 text-sm">
               <li>Email: Info@intunetuition.co.uk</li>
-              <li>Phone: 01234 567890</li>
             </ul>
           </div>
         </div>
