@@ -203,8 +203,8 @@ export const LOCATIONS: Location[] = [
         id: 'autumn-1',
         name: 'Autumn 1',
         dates: '24th Aug - 16th Oct',
-        weeks: '8 weeks',
-        lessons: 8,
+        weeks: '7 weeks',
+        lessons: 7,
         prices: {
           standard: 40.95,
           sibling: 75.75,

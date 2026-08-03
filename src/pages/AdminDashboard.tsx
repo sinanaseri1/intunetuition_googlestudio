@@ -416,7 +416,7 @@ export function AdminDashboard() {
                           className="flex h-8 w-[130px] rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                           value={u.role}
                           onChange={(e) => handleRoleChange(u.id, e.target.value)}
-                          disabled={u.email === 'naseri.sina007@gmail.com'} // Protect the super admin
+                          disabled={u.email === 'Info@intunetuition.co.uk'} // Protect the super admin
                         >
                           <option value="student">Student</option>
                           <option value="teacher">Teacher</option>

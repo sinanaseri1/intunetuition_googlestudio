@@ -132,8 +132,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // onAuthStateChanged creates the users and students documents, and may fire
     // before updateProfile completes (leaving 'New User' as the name). Write the
-    // correct name directly; onAuthStateChanged's sync heals any lost race.
-    await setDoc(doc(db, 'users', userCredential.user.uid), { name }, { merge: true });
+    // correct profile directly with all fields required by firestore.rules
+    // (isValidUser), so the write is permitted whether it lands as a create or
+    // an update; onAuthStateChanged's sync heals any lost race.
+    const adminEmail = import.meta.env.VITE_ADMIN_EMAIL || '';
+    const now = new Date().toISOString();
+    await setDoc(doc(db, 'users', userCredential.user.uid), {
+      email: userCredential.user.email || '',
+      name,
+      role: userCredential.user.email === adminEmail ? 'admin' : 'student',
+      createdAt: now,
+      updatedAt: now,
+    }, { merge: true });
     setProfile((prev) => prev ? { ...prev, name } : prev);
   };
 
