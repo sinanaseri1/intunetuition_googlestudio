@@ -1,24 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import admin from 'firebase-admin';
-import { initializeApp, getApps } from 'firebase/app';
-import { getFirestore, doc, setDoc, getDoc } from 'firebase/firestore';
+import { getAdminFirestore } from '../lib/firebase-admin';
 import { handleCors, verifyAuthToken, anonymizeSchema, sanitizeError, safeJsonResponse } from '../lib/api-utils';
-
-let firestoreDb: ReturnType<typeof getFirestore> | null = null;
-
-function getFirestoreDb() {
-  if (!firestoreDb) {
-    const firebaseConfig = {
-      apiKey: process.env.VITE_FIREBASE_API_KEY,
-      projectId: process.env.VITE_FIREBASE_PROJECT_ID,
-    };
-    if (getApps().length === 0) {
-      initializeApp(firebaseConfig);
-    }
-    firestoreDb = getFirestore();
-  }
-  return firestoreDb;
-}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   handleCors(req, res);
@@ -40,23 +23,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return safeJsonResponse(res, 400, { error: bodyValidation.error.errors[0]?.message || 'Invalid input' });
     }
 
-    if (!admin.apps.length) {
-      const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
-      if (!serviceAccount) {
-        return safeJsonResponse(res, 500, { error: 'Server configuration error' });
-      }
-      admin.initializeApp({
-        credential: admin.credential.cert(JSON.parse(serviceAccount)),
-      });
-    }
-
-    const db = getFirestoreDb();
+    const db = getAdminFirestore();
     const hash = userId.substring(0, 8);
     const anonymizedEmail = `anonymized_${hash}@anonymized.local`;
     const anonymizedName = '[DELETED]';
 
-    const userDocRef = doc(db, 'users', userId);
-    await setDoc(userDocRef, {
+    const userDocRef = db.collection('users').doc(userId);
+    await userDocRef.set({
       email: anonymizedEmail,
       name: anonymizedName,
       anonymizedAt: new Date().toISOString(),
@@ -64,10 +37,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       updatedAt: new Date().toISOString(),
     }, { merge: true });
 
-    const studentDocRef = doc(db, 'students', userId);
-    const studentDoc = await getDoc(studentDocRef);
-    if (studentDoc.exists()) {
-      await setDoc(studentDocRef, {
+    const studentDocRef = db.collection('students').doc(userId);
+    const studentDoc = await studentDocRef.get();
+    if (studentDoc.exists) {
+      await studentDocRef.set({
         childName: '[DELETED]',
         yearGroup: '[DELETED]',
         school: '[DELETED]',
@@ -86,9 +59,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return safeJsonResponse(res, 200, { success: true, message: 'Account anonymized successfully' });
   } catch (error) {
     const { status, message } = sanitizeError(error);
-    if (message === 'Unauthorized') {
-      return safeJsonResponse(res, 401, { error: 'Authentication required' });
-    }
     return safeJsonResponse(res, status, { error: message });
   }
 }

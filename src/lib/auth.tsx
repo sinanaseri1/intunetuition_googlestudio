@@ -34,6 +34,18 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function deriveDisplayName(firebaseUser: FirebaseUser): string {
+  const displayName = firebaseUser.displayName?.trim();
+  if (displayName) {
+    return displayName;
+  }
+  const emailLocalPart = firebaseUser.email?.split('@')[0]?.trim();
+  if (emailLocalPart) {
+    return emailLocalPart;
+  }
+  return 'New User';
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -49,7 +61,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const userDoc = await transaction.get(userDocRef);
             const studentDocRef = doc(db, 'students', firebaseUser.uid);
             const studentDoc = await transaction.get(studentDocRef);
-            
+
+            const derivedName = deriveDisplayName(firebaseUser);
+
             if (userDoc.exists()) {
               const data = userDoc.data() as UserProfile;
               // Ensure students document exists for every user
@@ -60,14 +74,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                   packageHistory: []
                 });
               }
+              // Heal placeholder/missing names from the sign-up race so the
+              // stored profile always matches the user's actual name.
+              const storedName = (data.name || '').trim();
+              if (storedName === '' || storedName === 'New User') {
+                const updatedAt = new Date().toISOString();
+                transaction.update(userDocRef, { name: derivedName, updatedAt });
+                return { ...data, name: derivedName, updatedAt };
+              }
               return data;
             } else {
               // Create a new profile, assigning admin role if it's the designated admin email
-          const adminEmail = import.meta.env.VITE_ADMIN_EMAIL || '';
+              const adminEmail = import.meta.env.VITE_ADMIN_EMAIL || '';
               const role: UserRole = firebaseUser.email === adminEmail ? 'admin' : 'student';
               const newProfile: UserProfile = {
                 email: firebaseUser.email || '',
-                name: firebaseUser.displayName || 'New User',
+                name: derivedName,
                 role: role,
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
@@ -78,7 +100,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 creditsRemaining: 0,
                 packageHistory: []
               });
-              
+
               return newProfile;
             }
           });
@@ -107,20 +129,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signUpWithEmail = async (email: string, password: string, name: string) => {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     await updateProfile(userCredential.user, { displayName: name });
-    
-    // onAuthStateChanged creates the users and students documents.
-    // We update the users document with the correct name here since onAuthStateChanged
-    // fires before updateProfile completes, so it gets 'New User' initially.
-    await new Promise<void>((resolve) => {
-      const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-        if (firebaseUser && firebaseUser.uid === userCredential.user.uid) {
-          unsubscribe();
-          resolve();
-        }
-      });
-    });
-    
-    // Update the name that onAuthStateChanged set to 'New User'
+
+    // onAuthStateChanged creates the users and students documents, and may fire
+    // before updateProfile completes (leaving 'New User' as the name). Write the
+    // correct name directly; onAuthStateChanged's sync heals any lost race.
     await setDoc(doc(db, 'users', userCredential.user.uid), { name }, { merge: true });
     setProfile((prev) => prev ? { ...prev, name } : prev);
   };

@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { z } from 'zod';
-import admin from 'firebase-admin';
+import { verifyIdToken } from './firebase-admin';
+import type { DecodedIdToken } from 'firebase-admin/auth';
 
 export function corsHeaders(origin?: string) {
   const allowedOrigin = process.env.APP_URL || '*';
@@ -27,7 +28,17 @@ export function handleCors(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Max-Age', headers['Access-Control-Max-Age']);
 }
 
+export class AuthError extends Error {
+  constructor() {
+    super('Unauthorized');
+    this.name = 'AuthError';
+  }
+}
+
 export function sanitizeError(error: unknown, defaultMsg = 'An internal error occurred') {
+  if (error instanceof AuthError) {
+    return { status: 401 as const, message: 'Authentication required' };
+  }
   if (error instanceof z.ZodError) {
     return { status: 400 as const, message: error.errors[0]?.message || 'Invalid input' };
   }
@@ -39,25 +50,18 @@ export function safeJsonResponse(res: VercelResponse, status: number, data: unkn
   return res.status(status).json(data);
 }
 
-export async function verifyAuthToken(req: VercelRequest): Promise<admin.auth.DecodedIdToken> {
+export async function verifyAuthToken(req: VercelRequest): Promise<DecodedIdToken> {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    throw new Error('Unauthorized');
+    throw new AuthError();
   }
 
   const token = authHeader.split(' ')[1];
-
-  if (!admin.apps.length) {
-    const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
-    if (!serviceAccount) {
-      throw new Error('Firebase service account not configured');
-    }
-    admin.initializeApp({
-      credential: admin.credential.cert(JSON.parse(serviceAccount)),
-    });
+  try {
+    return await verifyIdToken(token);
+  } catch {
+    throw new AuthError();
   }
-
-  return admin.auth().verifyIdToken(token);
 }
 
 export function requireEnv(name: string): string {

@@ -15,7 +15,7 @@ You will need to enter these into Vercel. Keep this list handy.
 *   `GEMINI_API_KEY`: Your Google Gemini API key (from Google AI Studio).
 *   `STRIPE_SECRET_KEY`: Your Stripe secret key (from Stripe Dashboard > Developers > API keys).
 *   `STRIPE_WEBHOOK_SECRET`: Your Stripe webhook signing secret (from Stripe Dashboard > Developers > Webhooks > your endpoint). **Required for payment processing to update Firestore.**
-*   `FIREBASE_SERVICE_ACCOUNT`: The full JSON of your Firebase service account (from Firebase Console > Project Settings > Service Accounts > Generate new private key). Paste as a single-line JSON string. **Required for account anonymization and data export.**
+*   `FIREBASE_SERVICE_ACCOUNT`: The full JSON of your Firebase service account (from Firebase Console > Project Settings > Service Accounts > Generate new private key). Paste as a single-line JSON string. **Required for Stripe webhook credit updates, account anonymization, and data export.**
 *   `VITE_ADMIN_EMAIL`: Email address that gets admin access (must match the email in `firestore.rules`).
 *   `APP_URL`: The final production URL of your Vercel app (e.g., `https://your-app-name.vercel.app`). *Note: You will set this after Vercel generates your URL.*
 
