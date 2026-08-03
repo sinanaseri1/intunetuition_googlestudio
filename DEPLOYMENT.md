@@ -45,6 +45,14 @@ By default, Firebase Authentication only allows logins from `localhost` and your
 ## 4. Configure Admin Email
 Admin access is controlled by email address. Make sure `VITE_ADMIN_EMAIL` in Vercel matches the email hardcoded in `firestore.rules`. If you need to change the admin email, update both places.
 
+## 4a. CRITICAL: Publish Firestore Security Rules
+Sign-up and login fail with "Missing or insufficient permissions" until the repo's `firestore.rules` are published to the custom database (`ai-studio-62953b58-6116-498b-9d65-2c51621042f0`). Either:
+
+- **Firebase Console (no CLI):** Firestore Database → select the `ai-studio-...` database → Rules tab → paste the full contents of `firestore.rules` → Publish.
+- **Firebase CLI:** install with `npm i -g firebase-tools`, then run `firebase login` and `firebase deploy --only firestore:rules` (config already in `firebase.json`/`.firebaserc`).
+
+Verify after publishing: a new sign-up should create `users/{uid}` and `students/{uid}` docs.
+
 ## 5. Set Up Stripe Webhooks
 To ensure payments correctly update student credits and package history:
 

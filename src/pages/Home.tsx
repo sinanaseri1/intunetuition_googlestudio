@@ -1,8 +1,9 @@
 import { Link } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../components/ui/card';
-import { Music, Star, Users } from 'lucide-react';
+import { Music, Star, Users, Quote } from 'lucide-react';
 import { motion } from 'motion/react';
+import { testimonials } from './Testimonials';
 import image1 from "../assets/image1.jpg";
 import image2 from "../assets/image2.jpg";
 import image3 from "../assets/image3.jpg";
@@ -214,6 +215,60 @@ export function Home() {
                 </CardFooter>
               </Card>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Testimonials */}
+      <section className="py-24 bg-stone-900 relative overflow-hidden">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-[#b9d9a1]/10 blur-3xl rounded-full pointer-events-none" />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">What Our Students Say</h2>
+            <p className="text-lg text-stone-400 max-w-2xl mx-auto">
+              Real words from children learning guitar with In Tune Tuition.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+            {testimonials.map((testimonial, index) => (
+              <motion.div
+                key={testimonial.id}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-50px" }}
+                transition={{ duration: 0.7, delay: index * 0.15 }}
+                className="relative bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl p-8"
+              >
+                <Quote className="w-10 h-10 text-[#b9d9a1] mb-4" />
+                <div className="flex gap-1 mb-4">
+                  {[...Array(5)].map((_, i) => (
+                    <Star
+                      key={i}
+                      className={`w-5 h-5 ${i < testimonial.rating ? 'text-yellow-400 fill-yellow-400' : 'text-stone-600'}`}
+                    />
+                  ))}
+                </div>
+                <p className="text-stone-200 italic leading-relaxed mb-6">"{testimonial.content}"</p>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-[#b9d9a1] flex items-center justify-center font-bold text-stone-900">
+                    {testimonial.name.charAt(0)}
+                  </div>
+                  <div>
+                    <div className="font-semibold text-white">{testimonial.name}</div>
+                    <div className="text-sm text-stone-400">Age {testimonial.age}</div>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+
+          <div className="text-center mt-12">
+            <Link to="/testimonials">
+              <Button className="rounded-full px-8 bg-white text-stone-900 hover:bg-white/90 border-white">
+                Read More Testimonials
+              </Button>
+            </Link>
           </div>
         </div>
       </section>
