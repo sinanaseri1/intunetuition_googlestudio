@@ -1,21 +1,30 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../lib/auth';
 import { db } from '../firebase';
-import { collection, query, where, getDocs, doc, getDoc, orderBy, Timestamp } from 'firebase/firestore';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '../components/ui/card';
+import { doc, getDoc } from 'firebase/firestore';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
-import { Badge } from '../components/ui/badge';
-import { Calendar, Clock, MapPin, Music, Star, CheckCircle2 } from 'lucide-react';
+import { Calendar, CheckCircle2, Music, Package } from 'lucide-react';
 import { format } from 'date-fns';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { LOCATIONS, formatPrice } from '../config/terms';
+
+function findTermInfo(packageId: string) {
+  for (const location of LOCATIONS) {
+    for (const term of location.terms) {
+      if (packageId.startsWith(`${location.id}-${term.id}-`)) {
+        return { locationLabel: location.label, termName: term.name, weeks: term.weeks, dates: term.dates };
+      }
+    }
+  }
+  return null;
+}
 
 export function Dashboard() {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [studentData, setStudentData] = useState<any>(null);
-  const [upcomingLessons, setUpcomingLessons] = useState<any[]>([]);
-  const [pastLessons, setPastLessons] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [paymentReceived, setPaymentReceived] = useState(false);
 
@@ -86,35 +95,6 @@ export function Dashboard() {
         if (studentDoc.exists()) {
           setStudentData(studentDoc.data());
         }
-
-        const bookingsQuery = query(
-          collection(db, 'bookings'),
-          where('studentId', '==', user.uid)
-        );
-        const bookingsSnapshot = await getDocs(bookingsQuery);
-        
-        const bookings = await Promise.all(bookingsSnapshot.docs.map(async (bookingDoc) => {
-          const bookingData = bookingDoc.data() as any;
-          const slotDoc = await getDoc(doc(db, 'lessonSlots', bookingData.lessonSlotId));
-          const slotData = slotDoc.exists() ? slotDoc.data() : null;
-          
-          return {
-            id: bookingDoc.id,
-            ...bookingData,
-            slot: slotData
-          };
-        }));
-
-        const now = new Date().toISOString();
-        
-        const upcoming = bookings.filter(b => b.slot && b.slot.startTime > now && b.status === 'booked');
-        const past = bookings.filter(b => (b.slot && b.slot.startTime <= now) || (b.status !== 'booked' && b.slot));
-
-        upcoming.sort((a, b) => a.slot.startTime.localeCompare(b.slot.startTime));
-        past.sort((a, b) => b.slot.startTime.localeCompare(a.slot.startTime));
-
-        setUpcomingLessons(upcoming);
-        setPastLessons(past);
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
       } finally {
@@ -130,6 +110,13 @@ export function Dashboard() {
     return <div className="p-8 text-center">Loading your dashboard...</div>;
   }
 
+  const history: any[] = studentData?.packageHistory || [];
+  const sortedHistory = [...history].sort(
+    (a, b) => new Date(b.purchasedAt).getTime() - new Date(a.purchasedAt).getTime()
+  );
+  const latest = sortedHistory[0];
+  const latestTermInfo = latest ? findTermInfo(latest.packageId) : null;
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       {subscriptionSuccess || (sessionId && paymentReceived) ? (
@@ -138,7 +125,7 @@ export function Dashboard() {
           <div>
             <h3 className="text-green-800 font-medium">Payment Successful!</h3>
             <p className="text-green-700 text-sm mt-1">
-              Your purchase has been confirmed and your lesson credits have been added. You can now start booking your lessons.
+              Your purchase has been confirmed and your lesson credits have been added.
             </p>
           </div>
         </div>
@@ -157,9 +144,9 @@ export function Dashboard() {
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
         <div>
           <h1 className="text-3xl font-bold text-stone-900">Welcome back, {profile?.name}</h1>
-          <p className="text-stone-600 mt-1">Manage your lessons and bookings</p>
+          <p className="text-stone-600 mt-1">Manage your lessons and payments</p>
         </div>
-        <Button className="bg-[#b9d9a1] text-stone-900 hover:bg-[#a5c58d]">
+        <Button className="bg-[#b9d9a1] text-stone-900 hover:bg-[#a5c58d]" onClick={() => navigate('/pricing')}>
           Book a Lesson
         </Button>
       </div>
@@ -257,43 +244,52 @@ export function Dashboard() {
           </Card>
         </div>
 
-        {/* Right Column: Schedule */}
+        {/* Right Column: Lessons & Purchases */}
         <div className="md:col-span-2 space-y-8">
           <Card>
             <CardHeader>
-              <CardTitle>Upcoming Lessons</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <Package className="w-5 h-5 text-[#b9d9a1]" />
+                Your Lessons
+              </CardTitle>
+              <CardDescription>Your current term package and remaining lessons</CardDescription>
             </CardHeader>
             <CardContent>
-              {upcomingLessons.length > 0 ? (
-                <div className="space-y-4">
-                  {upcomingLessons.map(lesson => (
-                    <div key={lesson.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-lg border border-stone-200 bg-stone-50">
-                      <div className="space-y-1 mb-4 sm:mb-0">
-                        <div className="flex items-center gap-2 font-medium text-stone-900">
-                          <Calendar className="w-4 h-4 text-[#b9d9a1]" />
-                          {format(new Date(lesson.slot.startTime), 'EEEE, MMMM do, yyyy')}
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-stone-600">
-                          <Clock className="w-4 h-4" />
-                          {format(new Date(lesson.slot.startTime), 'h:mm a')} - {format(new Date(lesson.slot.endTime), 'h:mm a')}
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-stone-600">
-                          <MapPin className="w-4 h-4" />
-                          {lesson.slot.location}
-                        </div>
-                      </div>
-                      <Button variant="outline" className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700">
-                        Cancel
-                      </Button>
+              {latest ? (
+                <div className="p-5 rounded-lg border border-stone-200 bg-stone-50">
+                  <div className="font-semibold text-stone-900">{latest.planName}</div>
+                  {latestTermInfo && (
+                    <div className="text-sm text-stone-600 mt-1">
+                      {latestTermInfo.termName} &middot; {latestTermInfo.weeks} &middot; {latestTermInfo.dates}
                     </div>
-                  ))}
+                  )}
+                  <div className="flex items-center gap-2 text-sm text-stone-500 mt-1">
+                    <Calendar className="w-4 h-4" />
+                    Purchased {format(new Date(latest.purchasedAt), 'MMMM do, yyyy')}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-5">
+                    <div>
+                      <div className="text-sm text-stone-500">Lessons Purchased</div>
+                      <div className="text-2xl font-bold text-stone-900">{latest.credits}</div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-stone-500">Lessons Remaining</div>
+                      <div className="text-2xl font-bold text-stone-900">{studentData?.creditsRemaining || 0}</div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-stone-500">Amount Paid</div>
+                      <div className="text-2xl font-bold text-stone-900">
+                        {latest.amountTotal != null ? formatPrice(latest.amountTotal) : '—'}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               ) : (
-                <div className="text-center py-8 text-stone-500">
+                <div className="text-center py-10 text-stone-500">
                   <Music className="w-12 h-12 mx-auto mb-3 text-stone-300" />
-                  <p>No upcoming lessons scheduled.</p>
-                  <Button variant="link" className="text-[#b9d9a1] hover:text-[#a5c58d] mt-2">
-                    Book your first lesson
+                  <p className="mb-4">You haven't purchased any lessons yet.</p>
+                  <Button className="bg-[#b9d9a1] text-stone-900 hover:bg-[#a5c58d]" onClick={() => navigate('/pricing')}>
+                    View Pricing
                   </Button>
                 </div>
               )}
@@ -302,38 +298,38 @@ export function Dashboard() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Past Lessons</CardTitle>
+              <CardTitle>Purchase History</CardTitle>
+              <CardDescription>Your previous lesson purchases</CardDescription>
             </CardHeader>
             <CardContent>
-              {pastLessons.length > 0 ? (
+              {sortedHistory.length > 0 ? (
                 <div className="space-y-4">
-                  {pastLessons.map(lesson => (
-                    <div key={lesson.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-lg border border-stone-100">
-                      <div className="space-y-1">
-                        <div className="font-medium text-stone-900">
-                          {format(new Date(lesson.slot.startTime), 'MMM do, yyyy')}
+                  {sortedHistory.map((entry, index) => {
+                    const termInfo = findTermInfo(entry.packageId);
+                    return (
+                      <div key={entry.sessionId || index} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-lg border border-stone-100">
+                        <div className="space-y-1">
+                          <div className="font-medium text-stone-900">{entry.planName}</div>
+                          {termInfo && (
+                            <div className="text-sm text-stone-500">
+                              {termInfo.termName} &middot; {termInfo.weeks} &middot; {termInfo.dates}
+                            </div>
+                          )}
                         </div>
-                        <div className="text-sm text-stone-500">
-                          {format(new Date(lesson.slot.startTime), 'h:mm a')}
+                        <div className="mt-2 sm:mt-0 flex items-center gap-4 text-sm">
+                          <span className="text-stone-500">{format(new Date(entry.purchasedAt), 'MMM do, yyyy')}</span>
+                          <span className="text-stone-700 font-medium">{entry.credits} lessons</span>
+                          <span className="font-semibold text-stone-900">
+                            {entry.amountTotal != null ? formatPrice(entry.amountTotal) : '—'}
+                          </span>
                         </div>
                       </div>
-                      <div className="mt-2 sm:mt-0 flex items-center gap-2">
-                        <Badge variant={lesson.status === 'completed' ? 'default' : 'secondary'} 
-                               className={lesson.status === 'completed' ? 'bg-[#b9d9a1] text-stone-900 hover:bg-[#a5c58d]' : ''}>
-                          {lesson.status}
-                        </Badge>
-                        {lesson.status === 'completed' && !lesson.feedbackRating && (
-                          <Button size="sm" variant="ghost" className="text-stone-600">
-                            <Star className="w-4 h-4 mr-1" /> Rate
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="text-center py-6 text-stone-500 text-sm">
-                  No past lessons yet.
+                  No purchases yet.
                 </div>
               )}
             </CardContent>

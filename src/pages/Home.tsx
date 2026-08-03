@@ -146,7 +146,7 @@ export function Home() {
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-stone-900 mb-4">Choose Your Learning Path</h2>
             <p className="text-lg text-stone-600 max-w-2xl mx-auto">
-              Select a subscription plan that fits your schedule and goals. All plans include high-quality acoustic guitar tuition.
+              Select a plan that fits your schedule and goals.
             </p>
           </div>
 
@@ -154,8 +154,7 @@ export function Home() {
               {[
                 {
                   id: 'basic',
-                  name: 'Basic Plan',
-                  lessons: '7 lessons per term',
+                  name: 'Standard Plan',
                   duration: '20 min lessons',
                   groupSize: 'Groups of 4-6 children',
                   guitarsProvided: 'Guitars provided',
@@ -163,8 +162,7 @@ export function Home() {
                 },
                 {
                   id: 'standard',
-                  name: 'Standard Plan',
-                  lessons: '7 lessons per term',
+                  name: 'Sibling Plan',
                   duration: '20 min lessons',
                   groupSize: 'Groups of 4-6 children',
                   guitarsProvided: 'Guitars provided',
@@ -173,7 +171,6 @@ export function Home() {
                 {
                   id: 'premium',
                   name: 'Premium Plan',
-                  lessons: '7 lessons per term',
                   duration: '20 min lessons',
                   groupSize: 'Groups of 2 children',
                   guitarsProvided: 'Guitars provided',
@@ -194,7 +191,6 @@ export function Home() {
                 <CardHeader className={plan.popular ? "pt-8" : ""}>
                   <CardTitle className="text-2xl">{plan.name}</CardTitle>
                   <div className="mt-4 space-y-2">
-                    <p className="text-stone-700 font-medium">{plan.lessons}</p>
                     <p className="text-stone-600">{plan.duration}</p>
                     <p className="text-stone-600">{plan.groupSize}</p>
                     <p className="text-stone-600">{plan.guitarsProvided}</p>

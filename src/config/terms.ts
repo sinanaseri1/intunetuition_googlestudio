@@ -48,8 +48,8 @@ export const LOCATIONS: Location[] = [
         weeks: '6 weeks',
         lessons: 6,
         prices: {
-          standard: 35.0,
-          sibling: 65.0,
+          standard: 35.1,
+          sibling: 65.1,
           premium: 66.0,
         },
         stripePriceIds: {
@@ -65,8 +65,8 @@ export const LOCATIONS: Location[] = [
         weeks: '7 weeks',
         lessons: 7,
         prices: {
-          standard: 41.0,
-          sibling: 76.0,
+          standard: 40.95,
+          sibling: 75.95,
           premium: 77.0,
         },
         stripePriceIds: {
@@ -82,8 +82,8 @@ export const LOCATIONS: Location[] = [
         weeks: '6 weeks',
         lessons: 6,
         prices: {
-          standard: 35.0,
-          sibling: 65.0,
+          standard: 35.1,
+          sibling: 65.1,
           premium: 66.0,
         },
         stripePriceIds: {
@@ -99,8 +99,8 @@ export const LOCATIONS: Location[] = [
         weeks: '5 weeks',
         lessons: 5,
         prices: {
-          standard: 29.5,
-          sibling: 54.5,
+          standard: 29.25,
+          sibling: 54.25,
           premium: 55.0,
         },
         stripePriceIds: {
@@ -127,8 +127,8 @@ export const LOCATIONS: Location[] = [
         weeks: '7 weeks',
         lessons: 7,
         prices: {
-          standard: 41.0,
-          sibling: 76.0,
+          standard: 40.95,
+          sibling: 75.95,
           premium: 77.0,
         },
         stripePriceIds: {
@@ -144,8 +144,8 @@ export const LOCATIONS: Location[] = [
         weeks: '7 weeks',
         lessons: 7,
         prices: {
-          standard: 41.0,
-          sibling: 76.0,
+          standard: 40.95,
+          sibling: 75.95,
           premium: 77.0,
         },
         stripePriceIds: {
@@ -161,8 +161,8 @@ export const LOCATIONS: Location[] = [
         weeks: '6 weeks',
         lessons: 6,
         prices: {
-          standard: 35.0,
-          sibling: 65.0,
+          standard: 35.1,
+          sibling: 65.1,
           premium: 66.0,
         },
         stripePriceIds: {
@@ -178,8 +178,8 @@ export const LOCATIONS: Location[] = [
         weeks: '5 weeks',
         lessons: 5,
         prices: {
-          standard: 29.5,
-          sibling: 54.5,
+          standard: 29.25,
+          sibling: 54.25,
           premium: 55.0,
         },
         stripePriceIds: {
@@ -206,9 +206,9 @@ export const LOCATIONS: Location[] = [
         weeks: '8 weeks',
         lessons: 8,
         prices: {
-          standard: 47.0,
-          sibling: 87.0,
-          premium: 88.0,
+          standard: 40.95,
+          sibling: 75.75,
+          premium: 77.0,
         },
         stripePriceIds: {
           standard: 'price_LEIC_AUT1_STD',
@@ -223,8 +223,8 @@ export const LOCATIONS: Location[] = [
         weeks: '8 weeks',
         lessons: 8,
         prices: {
-          standard: 47.0,
-          sibling: 87.0,
+          standard: 46.8,
+          sibling: 86.8,
           premium: 88.0,
         },
         stripePriceIds: {
@@ -240,8 +240,8 @@ export const LOCATIONS: Location[] = [
         weeks: '6 weeks',
         lessons: 6,
         prices: {
-          standard: 35.0,
-          sibling: 65.0,
+          standard: 35.1,
+          sibling: 65.1,
           premium: 66.0,
         },
         stripePriceIds: {
@@ -257,8 +257,8 @@ export const LOCATIONS: Location[] = [
         weeks: '4 weeks',
         lessons: 4,
         prices: {
-          standard: 23.5,
-          sibling: 43.5,
+          standard: 23.4,
+          sibling: 43.4,
           premium: 44.0,
         },
         stripePriceIds: {
