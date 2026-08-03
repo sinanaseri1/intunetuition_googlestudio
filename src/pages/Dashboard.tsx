@@ -17,6 +17,39 @@ export function Dashboard() {
   const [upcomingLessons, setUpcomingLessons] = useState<any[]>([]);
   const [pastLessons, setPastLessons] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [paymentReceived, setPaymentReceived] = useState(false);
+
+  const sessionId = searchParams.get('session_id');
+  const subscriptionSuccess = searchParams.get('subscription_success') === 'true';
+
+  useEffect(() => {
+    if (!user || !sessionId) return;
+    let cancelled = false;
+    let attempts = 0;
+    const poll = async () => {
+      attempts++;
+      try {
+        const docSnap = await getDoc(doc(db, 'students', user.uid));
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          const history: any[] = data.packageHistory || [];
+          const found = history.some((h: any) => h.sessionId === sessionId);
+          if (found) {
+            setStudentData(data);
+            setPaymentReceived(true);
+            return;
+          }
+        }
+      } catch (error) {
+        console.error("Error polling payment status:", error);
+      }
+      if (!cancelled && attempts < 8) {
+        setTimeout(poll, 2000);
+      }
+    };
+    poll();
+    return () => { cancelled = true; };
+  }, [user, sessionId]);
 
   useEffect(() => {
     let mounted = true;
@@ -99,17 +132,27 @@ export function Dashboard() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      {searchParams.get('subscription_success') === 'true' && (
+      {subscriptionSuccess || (sessionId && paymentReceived) ? (
         <div className="mb-8 bg-green-50 border border-green-200 rounded-lg p-4 flex items-start">
           <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5 mr-3 shrink-0" />
           <div>
-            <h3 className="text-green-800 font-medium">Subscription Successful!</h3>
+            <h3 className="text-green-800 font-medium">Payment Successful!</h3>
             <p className="text-green-700 text-sm mt-1">
-              Welcome to your new learning path. Your account has been updated and you can now start booking your lessons.
+              Your purchase has been confirmed and your lesson credits have been added. You can now start booking your lessons.
             </p>
           </div>
         </div>
-      )}
+      ) : (sessionId && !paymentReceived && (
+        <div className="mb-8 bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start">
+          <CheckCircle2 className="h-5 w-5 text-blue-600 mt-0.5 mr-3 shrink-0" />
+          <div>
+            <h3 className="text-blue-800 font-medium">Confirming your payment…</h3>
+            <p className="text-blue-700 text-sm mt-1">
+              We're processing your payment. Your credits will appear here shortly.
+            </p>
+          </div>
+        </div>
+      ))}
 
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
         <div>

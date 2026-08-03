@@ -34,10 +34,12 @@ export function Pricing() {
     const stripePriceId = activeTerm.stripePriceIds[packageId];
     setLoading(packageId);
     try {
+      const token = await user.getIdToken();
       const response = await fetch('/api/create-checkout-session', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           priceId: stripePriceId,

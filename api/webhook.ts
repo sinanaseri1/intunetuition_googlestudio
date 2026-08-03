@@ -1,31 +1,30 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Stripe from 'stripe';
-import { initializeApp, getApps } from 'firebase/app';
-import { getFirestore, doc, setDoc, getDoc, updateDoc, increment, arrayUnion } from 'firebase/firestore';
-import { handleCors, sanitizeError, safeJsonResponse, requireEnv } from '../lib/api-utils';
+import admin from 'firebase-admin';
+import { getAdminFirestore } from '../lib/firebase-admin';
+import { handleCors, safeJsonResponse } from '../lib/api-utils';
 
-let firestoreDb: ReturnType<typeof getFirestore> | null = null;
 let stripe: Stripe | null = null;
-
-function getFirestoreDb() {
-  if (!firestoreDb) {
-    const firebaseConfig = {
-      apiKey: process.env.VITE_FIREBASE_API_KEY,
-      projectId: process.env.VITE_FIREBASE_PROJECT_ID,
-    };
-    if (getApps().length === 0) {
-      initializeApp(firebaseConfig);
-    }
-    firestoreDb = getFirestore();
-  }
-  return firestoreDb;
-}
 
 function getStripe(): Stripe {
   if (!stripe) {
-    stripe = new Stripe(requireEnv('STRIPE_SECRET_KEY'));
+    stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
   }
   return stripe;
+}
+
+async function getRawBody(req: VercelRequest): Promise<string> {
+  if (typeof req.body === 'string') {
+    return req.body;
+  }
+  if (Buffer.isBuffer(req.body)) {
+    return req.body.toString('utf8');
+  }
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) {
+    chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+  }
+  return Buffer.concat(chunks).toString('utf8');
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -50,14 +49,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return safeJsonResponse(res, 500, { error: 'Webhook not configured' });
   }
 
-  try {
-    const event = getStripe().webhooks.constructEvent(
-      typeof req.body === 'string' ? req.body : JSON.stringify(req.body),
-      sig,
-      webhookSecret
-    );
+  if (!process.env.STRIPE_SECRET_KEY) {
+    console.error('STRIPE_SECRET_KEY not configured');
+    return safeJsonResponse(res, 500, { error: 'Webhook not configured' });
+  }
 
-    const db = getFirestoreDb();
+  let event: Stripe.Event;
+  try {
+    const rawBody = await getRawBody(req);
+    event = getStripe().webhooks.constructEvent(rawBody, sig, webhookSecret);
+  } catch (error) {
+    console.error('Stripe webhook signature verification failed:', error);
+    return safeJsonResponse(res, 400, { error: 'Invalid signature' });
+  }
+
+  try {
+    const db = getAdminFirestore();
 
     switch (event.type) {
       case 'checkout.session.completed': {
@@ -65,20 +72,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { studentId, packageId, credits, location, planName } = session.metadata || {};
 
         if (studentId) {
-          const studentDocRef = doc(db, 'students', studentId);
-          const studentDoc = await getDoc(studentDocRef);
+          const studentDocRef = db.collection('students').doc(studentId);
+          const studentDoc = await studentDocRef.get();
 
           const creditAmount = credits ? parseInt(credits, 10) : 0;
 
-          if (studentDoc.exists()) {
+          if (studentDoc.exists) {
+            const history = (studentDoc.data()?.packageHistory as Array<Record<string, unknown>>) || [];
+            const alreadyProcessed = history.some((h) => h.sessionId === session.id);
+            if (alreadyProcessed) {
+              console.log(`Checkout session already processed, skipping: ${session.id}`);
+              return safeJsonResponse(res, 200, { received: true });
+            }
+
             const updates: Record<string, unknown> = {
               updatedAt: new Date().toISOString(),
             };
             if (creditAmount > 0) {
-              updates.creditsRemaining = increment(creditAmount);
+              updates.creditsRemaining = admin.firestore.FieldValue.increment(creditAmount);
             }
             if (packageId) {
-              updates.packageHistory = arrayUnion({
+              updates.packageHistory = admin.firestore.FieldValue.arrayUnion({
                 packageId,
                 location: location || '',
                 planName: planName || '',
@@ -88,7 +102,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 amountTotal: session.amount_total ? session.amount_total / 100 : null,
               });
             }
-            await updateDoc(studentDocRef, updates as any);
+            await studentDocRef.update(updates);
           }
         }
 
@@ -120,8 +134,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return safeJsonResponse(res, 200, { received: true });
   } catch (error) {
-    const { status, message } = sanitizeError(error, 'Webhook processing failed');
-    return safeJsonResponse(res, status, { error: message });
+    console.error('Webhook processing failed:', error);
+    return safeJsonResponse(res, 500, { error: 'Webhook processing failed' });
   }
 }
 

@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Stripe from 'stripe';
-import { handleCors, checkoutSchema, sanitizeError, safeJsonResponse } from '../lib/api-utils';
+import { handleCors, checkoutSchema, sanitizeError, safeJsonResponse, verifyAuthToken } from '../lib/api-utils';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   handleCors(req, res);
@@ -14,12 +14,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    const decodedToken = await verifyAuthToken(req);
+
     const validation = checkoutSchema.safeParse(req.body);
     if (!validation.success) {
       return safeJsonResponse(res, 400, { error: validation.error.errors[0]?.message || 'Invalid input' });
     }
 
     const { priceId, studentId, packageId, credits, location, planName } = validation.data;
+
+    if (studentId !== decodedToken.uid) {
+      return safeJsonResponse(res, 403, { error: 'Forbidden: cannot checkout for another account' });
+    }
 
     if (!process.env.STRIPE_SECRET_KEY) {
       return safeJsonResponse(res, 500, { error: 'Payment processing not configured' });

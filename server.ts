@@ -1,15 +1,119 @@
-import express from "express";
-import { createServer as createViteServer } from "vite";
-import path from "path";
+import 'dotenv/config';
+import express from 'express';
+import { createServer as createViteServer } from 'vite';
 import Stripe from "stripe";
-import { z } from "zod";
 import admin from "firebase-admin";
-import { initializeApp, getApps } from "firebase/app";
-import { getFirestore, doc, setDoc, getDoc, collection, query, where, getDocs, updateDoc, increment, arrayUnion } from "firebase/firestore";
+import { getAdminFirestore, verifyIdToken } from './lib/firebase-admin';
+import { checkoutSchema, subscriptionSchema, anonymizeSchema, sanitizeError, AuthError } from './lib/api-utils';
 
 async function startServer() {
   const app = express();
   const PORT = parseInt(process.env.PORT || '3000', 10);
+
+  // Webhook route must be registered before express.json() so the raw body
+  // is preserved for Stripe signature verification.
+  app.post("/api/webhook", express.raw({ type: () => true }), async (req, res) => {
+    const sig = req.headers["stripe-signature"];
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+    if (!sig || typeof sig !== "string") {
+      return res.status(400).json({ error: "Missing Stripe signature" });
+    }
+    if (!webhookSecret) {
+      console.error("STRIPE_WEBHOOK_SECRET not configured");
+      return res.status(500).json({ error: "Webhook not configured" });
+    }
+    if (!process.env.STRIPE_SECRET_KEY) {
+      console.error("STRIPE_SECRET_KEY not configured");
+      return res.status(500).json({ error: "Webhook not configured" });
+    }
+
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+    let event: Stripe.Event;
+    try {
+      const rawBody = Buffer.isBuffer(req.body) ? req.body.toString("utf8") : String(req.body ?? "");
+      event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
+    } catch (error) {
+      console.error("Stripe webhook signature verification failed:", error);
+      return res.status(400).json({ error: "Invalid signature" });
+    }
+
+    try {
+      const db = getAdminFirestore();
+
+      switch (event.type) {
+        case "checkout.session.completed": {
+          const session = event.data.object as Stripe.Checkout.Session;
+          const { studentId, packageId, credits, location, planName } = session.metadata || {};
+
+          if (studentId) {
+            const studentDocRef = db.collection("students").doc(studentId);
+            const studentDoc = await studentDocRef.get();
+
+            const creditAmount = credits ? parseInt(credits, 10) : 0;
+
+            if (studentDoc.exists) {
+              const history = (studentDoc.data()?.packageHistory as Array<Record<string, unknown>>) || [];
+              const alreadyProcessed = history.some((h) => h.sessionId === session.id);
+              if (alreadyProcessed) {
+                console.log(`Checkout session already processed, skipping: ${session.id}`);
+                return res.status(200).json({ received: true });
+              }
+
+              const updates: Record<string, unknown> = {
+                updatedAt: new Date().toISOString(),
+              };
+              if (creditAmount > 0) {
+                updates.creditsRemaining = admin.firestore.FieldValue.increment(creditAmount);
+              }
+              if (packageId) {
+                updates.packageHistory = admin.firestore.FieldValue.arrayUnion({
+                  packageId,
+                  location: location || "",
+                  planName: planName || "",
+                  credits: creditAmount,
+                  purchasedAt: new Date().toISOString(),
+                  sessionId: session.id,
+                  amountTotal: session.amount_total ? session.amount_total / 100 : null,
+                });
+              }
+              await studentDocRef.update(updates);
+            }
+          }
+
+          console.log(`Checkout session completed: ${session.id}`, { studentId, packageId, credits, location, planName });
+          break;
+        }
+
+        case "customer.subscription.created":
+        case "customer.subscription.updated": {
+          const subscription = event.data.object as Stripe.Subscription;
+          console.log(`Subscription ${event.type.split(".").pop()}: ${subscription.id}`, {
+            customerId: subscription.customer,
+            status: subscription.status,
+          });
+          break;
+        }
+
+        case "customer.subscription.deleted": {
+          const subscription = event.data.object as Stripe.Subscription;
+          console.log(`Subscription cancelled: ${subscription.id}`, {
+            customerId: subscription.customer,
+          });
+          break;
+        }
+
+        default:
+          console.log(`Unhandled Stripe event: ${event.type}`);
+      }
+
+      return res.status(200).json({ received: true });
+    } catch (error) {
+      console.error("Webhook processing failed:", error);
+      return res.status(500).json({ error: "Webhook processing failed" });
+    }
+  });
 
   app.use(express.json());
 
@@ -17,244 +121,182 @@ async function startServer() {
     res.json({ status: "ok" });
   });
 
-  const checkoutSchema = z.object({
-    priceId: z.string().min(1, 'priceId is required'),
-    studentId: z.string().min(1, 'studentId is required'),
-    packageId: z.string().optional(),
-    credits: z.union([z.string(), z.number()]).optional(),
-    location: z.string().optional(),
-    planName: z.string().optional(),
-  });
-
-  const subscriptionSchema = z.object({
-    priceId: z.string().min(1, 'priceId is required'),
-    studentId: z.string().min(1, 'studentId is required'),
-    planName: z.string().optional(),
-  });
-
-  const anonymizeSchema = z.object({
-    reason: z.string().max(1000).optional(),
-  });
-
-  let firestoreDb: ReturnType<typeof getFirestore> | null = null;
-
-  function getFirestoreDb() {
-    if (!firestoreDb) {
-      const firebaseConfig = {
-        apiKey: process.env.VITE_FIREBASE_API_KEY,
-        projectId: process.env.VITE_FIREBASE_PROJECT_ID,
-      };
-      if (getApps().length === 0) {
-        initializeApp(firebaseConfig);
-      }
-      firestoreDb = getFirestore();
+  async function requireUserId(req: express.Request): Promise<string> {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      throw new AuthError();
     }
-    return firestoreDb;
-  }
-
-  function sanitizeError(error: unknown, defaultMsg = 'An internal error occurred') {
-    if (error instanceof z.ZodError) {
-      return { status: 400 as const, message: error.errors[0]?.message || 'Invalid input' };
+    const token = authHeader.split(" ")[1];
+    try {
+      const decoded = await verifyIdToken(token);
+      return decoded.uid;
+    } catch {
+      throw new AuthError();
     }
-    console.error('Server error:', error);
-    return { status: 500 as const, message: defaultMsg };
   }
 
   app.post("/api/create-checkout-session", async (req, res) => {
     try {
+      const uid = await requireUserId(req);
       const validation = checkoutSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ error: validation.error.errors[0]?.message || 'Invalid input' });
+        return res.status(400).json({ error: validation.error.errors[0]?.message || "Invalid input" });
       }
 
       const { priceId, studentId, packageId, credits, location, planName } = validation.data;
 
+      if (studentId !== uid) {
+        return res.status(403).json({ error: "Forbidden: cannot checkout for another account" });
+      }
+
       if (!process.env.STRIPE_SECRET_KEY) {
-        return res.status(500).json({ error: 'Payment processing not configured' });
+        return res.status(500).json({ error: "Payment processing not configured" });
       }
 
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
       const session = await stripe.checkout.sessions.create({
-        payment_method_types: ['card'],
+        payment_method_types: ["card"],
         line_items: [
           {
             price: priceId,
             quantity: 1,
           },
         ],
-        mode: 'payment',
+        mode: "payment",
         success_url: `${process.env.APP_URL}/dashboard?session_id={CHECKOUT_SESSION_ID}&success=true`,
         cancel_url: `${process.env.APP_URL}/dashboard?canceled=true`,
         metadata: {
           studentId,
-          packageId: packageId || '',
-          credits: credits?.toString() || '',
-          location: location || '',
-          planName: planName || '',
+          packageId: packageId || "",
+          credits: credits?.toString() || "",
+          location: location || "",
+          planName: planName || "",
         },
       });
 
       res.json({ id: session.id, url: session.url });
     } catch (error) {
-      const { status, message } = sanitizeError(error, 'Failed to create checkout session');
+      const { status, message } = sanitizeError(error, "Failed to create checkout session");
       res.status(status).json({ error: message });
     }
   });
 
   app.post("/api/create-subscription-session", async (req, res) => {
     try {
+      const uid = await requireUserId(req);
       const validation = subscriptionSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ error: validation.error.errors[0]?.message || 'Invalid input' });
+        return res.status(400).json({ error: validation.error.errors[0]?.message || "Invalid input" });
       }
 
       const { priceId, studentId, planName } = validation.data;
 
+      if (studentId !== uid) {
+        return res.status(403).json({ error: "Forbidden: cannot checkout for another account" });
+      }
+
       if (!process.env.STRIPE_SECRET_KEY) {
-        return res.status(500).json({ error: 'Payment processing not configured' });
+        return res.status(500).json({ error: "Payment processing not configured" });
       }
 
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
       const session = await stripe.checkout.sessions.create({
-        payment_method_types: ['card'],
+        payment_method_types: ["card"],
         line_items: [
           {
             price: priceId,
             quantity: 1,
           },
         ],
-        mode: 'subscription',
+        mode: "subscription",
         success_url: `${process.env.APP_URL}/dashboard?session_id={CHECKOUT_SESSION_ID}&subscription_success=true`,
         cancel_url: `${process.env.APP_URL}/dashboard?canceled=true`,
         metadata: {
           studentId,
-          planName: planName || '',
+          planName: planName || "",
         },
       });
 
       res.json({ id: session.id, url: session.url });
     } catch (error) {
-      const { status, message } = sanitizeError(error, 'Failed to create subscription session');
+      const { status, message } = sanitizeError(error, "Failed to create subscription session");
       res.status(status).json({ error: message });
     }
   });
 
   app.post("/api/anonymize-account", async (req, res) => {
     try {
-      const authHeader = req.headers.authorization;
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ error: 'Authentication required' });
-      }
+      const uid = await requireUserId(req);
 
       const validation = anonymizeSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ error: validation.error.errors[0]?.message || 'Invalid input' });
+        return res.status(400).json({ error: validation.error.errors[0]?.message || "Invalid input" });
       }
 
-      const token = authHeader.split(' ')[1];
-
-      if (!admin.apps.length) {
-        const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
-        if (!serviceAccount) {
-          return res.status(500).json({ error: 'Server configuration error' });
-        }
-        admin.initializeApp({
-          credential: admin.credential.cert(JSON.parse(serviceAccount)),
-        });
-      }
-
-      const decodedToken = await admin.auth().verifyIdToken(token);
-      const userId = decodedToken.uid;
-
-      const db = getFirestoreDb();
-      const hash = userId.substring(0, 8);
+      const db = getAdminFirestore();
+      const hash = uid.substring(0, 8);
       const anonymizedEmail = `anonymized_${hash}@anonymized.local`;
-      const anonymizedName = '[DELETED]';
+      const anonymizedName = "[DELETED]";
 
-      const userDocRef = doc(db, 'users', userId);
-      await setDoc(userDocRef, {
+      const userDocRef = db.collection("users").doc(uid);
+      await userDocRef.set({
         email: anonymizedEmail,
         name: anonymizedName,
         anonymizedAt: new Date().toISOString(),
-        originalId: userId,
+        originalId: uid,
         updatedAt: new Date().toISOString(),
       }, { merge: true });
 
-      const studentDocRef = doc(db, 'students', userId);
-      const studentDoc = await getDoc(studentDocRef);
-      if (studentDoc.exists()) {
-        await setDoc(studentDocRef, {
-          childName: '[DELETED]',
-          yearGroup: '[DELETED]',
-          school: '[DELETED]',
-          phone: '[DELETED]',
+      const studentDocRef = db.collection("students").doc(uid);
+      const studentDoc = await studentDocRef.get();
+      if (studentDoc.exists) {
+        await studentDocRef.set({
+          childName: "[DELETED]",
+          yearGroup: "[DELETED]",
+          school: "[DELETED]",
+          phone: "[DELETED]",
           anonymizedAt: new Date().toISOString(),
-          originalId: userId,
+          originalId: uid,
           gdprConsentGiven: false,
         }, { merge: true });
       }
 
-      await admin.auth().updateUser(userId, {
+      await admin.auth().updateUser(uid, {
         email: anonymizedEmail,
         displayName: anonymizedName,
       });
 
-      res.json({ success: true, message: 'Account anonymized successfully' });
+      res.json({ success: true, message: "Account anonymized successfully" });
     } catch (error) {
       const { status, message } = sanitizeError(error);
-      if (message === 'Unauthorized') {
-        return res.status(401).json({ error: 'Authentication required' });
-      }
       res.status(status).json({ error: message });
     }
   });
 
   app.get("/api/export-data", async (req, res) => {
     try {
-      const authHeader = req.headers.authorization;
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ error: 'Authentication required' });
-      }
+      const uid = await requireUserId(req);
 
-      const token = authHeader.split(' ')[1];
+      const db = getAdminFirestore();
 
-      if (!admin.apps.length) {
-        const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
-        if (!serviceAccount) {
-          return res.status(500).json({ error: 'Server configuration error' });
-        }
-        admin.initializeApp({
-          credential: admin.credential.cert(JSON.parse(serviceAccount)),
-        });
-      }
+      const userDoc = await db.collection("users").doc(uid).get();
+      const studentDoc = await db.collection("students").doc(uid).get();
 
-      const decodedToken = await admin.auth().verifyIdToken(token);
-      const userId = decodedToken.uid;
-
-      const db = getFirestoreDb();
-
-      const userDoc = await getDoc(doc(db, 'users', userId));
-      const studentDoc = await getDoc(doc(db, 'students', userId));
-
-      const bookingsQuery = query(collection(db, 'bookings'), where('studentId', '==', userId));
-      const bookingsSnapshot = await getDocs(bookingsQuery);
+      const bookingsSnapshot = await db.collection("bookings").where("studentId", "==", uid).get();
       const bookings = bookingsSnapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
 
       const data = {
         exportDate: new Date().toISOString(),
-        account: userDoc.exists() ? userDoc.data() : null,
-        student: studentDoc.exists() ? studentDoc.data() : null,
+        account: userDoc.exists ? userDoc.data() : null,
+        student: studentDoc.exists ? studentDoc.data() : null,
         bookings,
       };
 
       res.json(data);
     } catch (error) {
       const { status, message } = sanitizeError(error);
-      if (message === 'Unauthorized') {
-        return res.status(401).json({ error: 'Authentication required' });
-      }
       res.status(status).json({ error: message });
     }
   });
