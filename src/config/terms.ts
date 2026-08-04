@@ -53,9 +53,9 @@ export const LOCATIONS: Location[] = [
           premium: 66.0,
         },
         stripePriceIds: {
-          standard: 'price_NOTT_AUT1_STD',
-          sibling: 'price_NOTT_AUT1_SIB',
-          premium: 'price_NOTT_AUT1_PRE',
+          standard: 'price_1U0l53DEUlJgtpZgtgg7U6f7',
+          sibling: 'price_1U0l55DEUlJgtpZgmaWC5YRS',
+          premium: 'price_1U0l55DEUlJgtpZg2Ru568wi',
         },
       },
       {
@@ -70,9 +70,9 @@ export const LOCATIONS: Location[] = [
           premium: 77.0,
         },
         stripePriceIds: {
-          standard: 'price_NOTT_AUT2_STD',
-          sibling: 'price_NOTT_AUT2_SIB',
-          premium: 'price_NOTT_AUT2_PRE',
+          standard: 'price_1U0l56DEUlJgtpZgYkigMzWW',
+          sibling: 'price_1U0l57DEUlJgtpZg0p0knvca',
+          premium: 'price_1U0l58DEUlJgtpZg2Dti771v',
         },
       },
       {
@@ -87,9 +87,9 @@ export const LOCATIONS: Location[] = [
           premium: 66.0,
         },
         stripePriceIds: {
-          standard: 'price_NOTT_SP1_STD',
-          sibling: 'price_NOTT_SP1_SIB',
-          premium: 'price_NOTT_SP1_PRE',
+          standard: 'price_1U0l5ADEUlJgtpZgD77oqaaj',
+          sibling: 'price_1U0l5BDEUlJgtpZg8NesXolU',
+          premium: 'price_1U0l5CDEUlJgtpZgMuuNaX1g',
         },
       },
       {
@@ -104,9 +104,9 @@ export const LOCATIONS: Location[] = [
           premium: 55.0,
         },
         stripePriceIds: {
-          standard: 'price_NOTT_SP2_STD',
-          sibling: 'price_NOTT_SP2_SIB',
-          premium: 'price_NOTT_SP2_PRE',
+          standard: 'price_1U0l5DDEUlJgtpZglvtWOBLn',
+          sibling: 'price_1U0l5EDEUlJgtpZgUSf783cC',
+          premium: 'price_1U0l5FDEUlJgtpZgr9znRfU1',
         },
       },
     ],
@@ -132,9 +132,9 @@ export const LOCATIONS: Location[] = [
           premium: 77.0,
         },
         stripePriceIds: {
-          standard: 'price_DERB_AUT1_STD',
-          sibling: 'price_DERB_AUT1_SIB',
-          premium: 'price_DERB_AUT1_PRE',
+          standard: 'price_1U0l5GDEUlJgtpZgus0RgHBL',
+          sibling: 'price_1U0l5HDEUlJgtpZgjT5ESNuo',
+          premium: 'price_1U0l5IDEUlJgtpZgFHyqD8xN',
         },
       },
       {
@@ -149,9 +149,9 @@ export const LOCATIONS: Location[] = [
           premium: 77.0,
         },
         stripePriceIds: {
-          standard: 'price_DERB_AUT2_STD',
-          sibling: 'price_DERB_AUT2_SIB',
-          premium: 'price_DERB_AUT2_PRE',
+          standard: 'price_1U0l5JDEUlJgtpZgcBN7R6xN',
+          sibling: 'price_1U0l5KDEUlJgtpZgKumcruWE',
+          premium: 'price_1U0l5LDEUlJgtpZgJwKFTG7w',
         },
       },
       {
@@ -166,9 +166,9 @@ export const LOCATIONS: Location[] = [
           premium: 66.0,
         },
         stripePriceIds: {
-          standard: 'price_DERB_SP1_STD',
-          sibling: 'price_DERB_SP1_SIB',
-          premium: 'price_DERB_SP1_PRE',
+          standard: 'price_1U0l5MDEUlJgtpZgMgmYfcB3',
+          sibling: 'price_1U0l5NDEUlJgtpZgFUjf95Gw',
+          premium: 'price_1U0l5ODEUlJgtpZg1qBAY2ZR',
         },
       },
       {
@@ -183,9 +183,9 @@ export const LOCATIONS: Location[] = [
           premium: 55.0,
         },
         stripePriceIds: {
-          standard: 'price_DERB_SP2_STD',
-          sibling: 'price_DERB_SP2_SIB',
-          premium: 'price_DERB_SP2_PRE',
+          standard: 'price_1U0l5PDEUlJgtpZgWh2Zk5Yv',
+          sibling: 'price_1U0l5QDEUlJgtpZgV5RkNBp8',
+          premium: 'price_1U0l5RDEUlJgtpZg4e8RfSc8',
         },
       },
     ],
@@ -211,9 +211,9 @@ export const LOCATIONS: Location[] = [
           premium: 77.0,
         },
         stripePriceIds: {
-          standard: 'price_LEIC_AUT1_STD',
-          sibling: 'price_LEIC_AUT1_SIB',
-          premium: 'price_LEIC_AUT1_PRE',
+          standard: 'price_1U0l5SDEUlJgtpZgkMsqac7i',
+          sibling: 'price_1U0l5TDEUlJgtpZgCNo4GmX2',
+          premium: 'price_1U0l5UDEUlJgtpZgrXw8GYHI',
         },
       },
       {
@@ -228,9 +228,9 @@ export const LOCATIONS: Location[] = [
           premium: 88.0,
         },
         stripePriceIds: {
-          standard: 'price_LEIC_AUT2_STD',
-          sibling: 'price_LEIC_AUT2_SIB',
-          premium: 'price_LEIC_AUT2_PRE',
+          standard: 'price_1U0l5VDEUlJgtpZgDKwf3ccj',
+          sibling: 'price_1U0l5WDEUlJgtpZgCTdKCXxa',
+          premium: 'price_1U0l5XDEUlJgtpZgvl7ruuVH',
         },
       },
       {
@@ -245,9 +245,9 @@ export const LOCATIONS: Location[] = [
           premium: 66.0,
         },
         stripePriceIds: {
-          standard: 'price_LEIC_SP1_STD',
-          sibling: 'price_LEIC_SP1_SIB',
-          premium: 'price_LEIC_SP1_PRE',
+          standard: 'price_1U0l5YDEUlJgtpZgonaXHHss',
+          sibling: 'price_1U0l5ZDEUlJgtpZgrD0YrVzl',
+          premium: 'price_1U0l5aDEUlJgtpZgbwCVCOwZ',
         },
       },
       {
@@ -262,9 +262,9 @@ export const LOCATIONS: Location[] = [
           premium: 44.0,
         },
         stripePriceIds: {
-          standard: 'price_LEIC_SP2_STD',
-          sibling: 'price_LEIC_SP2_SIB',
-          premium: 'price_LEIC_SP2_PRE',
+          standard: 'price_1U0l5bDEUlJgtpZg5YSwsSJA',
+          sibling: 'price_1U0l5cDEUlJgtpZgREwDPdmO',
+          premium: 'price_1U0l5dDEUlJgtpZgiWtwtnXP',
         },
       },
     ],

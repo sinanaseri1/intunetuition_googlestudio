@@ -4,7 +4,7 @@ import { createServer as createViteServer } from 'vite';
 import Stripe from "stripe";
 import admin from "firebase-admin";
 import { getAdminFirestore, verifyIdToken } from './lib/firebase-admin';
-import { checkoutSchema, subscriptionSchema, anonymizeSchema, sanitizeError, AuthError } from './lib/api-utils';
+import { checkoutSchema, subscriptionSchema, anonymizeSchema, sanitizeError, AuthError, ServerConfigError } from './lib/api-utils';
 
 async function startServer() {
   const app = express();
@@ -125,6 +125,9 @@ async function startServer() {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       throw new AuthError();
+    }
+    if (!process.env.FIREBASE_SERVICE_ACCOUNT && !process.env.VITE_FIREBASE_PROJECT_ID) {
+      throw new ServerConfigError("Firebase Admin is not configured: set FIREBASE_SERVICE_ACCOUNT or VITE_FIREBASE_PROJECT_ID");
     }
     const token = authHeader.split(" ")[1];
     try {

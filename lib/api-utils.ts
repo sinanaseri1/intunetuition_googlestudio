@@ -35,6 +35,17 @@ export class AuthError extends Error {
   }
 }
 
+// Distinct from AuthError so a missing FIREBASE_SERVICE_ACCOUNT (a server
+// misconfiguration) surfaces as a 500 instead of masquerading as the client
+// having sent a bad/missing token — those look identical from verifyIdToken()
+// alone but need very different fixes.
+export class ServerConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ServerConfigError';
+  }
+}
+
 function isStripeMissingPriceError(error: unknown): boolean {
   return (
     !!error &&
@@ -49,6 +60,10 @@ function isStripeMissingPriceError(error: unknown): boolean {
 export function sanitizeError(error: unknown, defaultMsg = 'An internal error occurred') {
   if (error instanceof AuthError) {
     return { status: 401 as const, message: 'Authentication required' };
+  }
+  if (error instanceof ServerConfigError) {
+    console.error('Server configuration error:', error.message);
+    return { status: 500 as const, message: 'Server is not fully configured. Please contact the site administrator.' };
   }
   if (error instanceof z.ZodError) {
     return { status: 400 as const, message: error.errors[0]?.message || 'Invalid input' };
@@ -69,6 +84,12 @@ export async function verifyAuthToken(req: VercelRequest): Promise<DecodedIdToke
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     throw new AuthError();
+  }
+  // verifyIdToken() below only needs *a* Firebase Admin app to exist — it can
+  // run against a projectId-only app with no service account (see
+  // lib/firebase-admin.ts). Only bail early if neither is configured at all.
+  if (!process.env.FIREBASE_SERVICE_ACCOUNT && !process.env.VITE_FIREBASE_PROJECT_ID) {
+    throw new ServerConfigError('Firebase Admin is not configured: set FIREBASE_SERVICE_ACCOUNT or VITE_FIREBASE_PROJECT_ID');
   }
 
   const token = authHeader.split(' ')[1];
