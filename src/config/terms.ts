@@ -274,3 +274,13 @@ export const LOCATIONS: Location[] = [
 export function formatPrice(amount: number): string {
   return `£${amount.toFixed(2)}`;
 }
+
+// The IDs baked into LOCATIONS above are placeholders until `npm run prices:create`
+// is run against a real Stripe account (it rewrites this file in place with the
+// live/test price IDs it creates). Anything still matching this shape hasn't been
+// synced yet, so checkout should be disabled rather than sent to Stripe.
+const PLACEHOLDER_PRICE_ID_PATTERN = /^price_(NOTT|DERB|LEIC)_/;
+
+export function isPlaceholderPriceId(priceId: string | undefined | null): boolean {
+  return !priceId || PLACEHOLDER_PRICE_ID_PATTERN.test(priceId);
+}

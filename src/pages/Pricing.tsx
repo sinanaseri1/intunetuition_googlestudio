@@ -4,7 +4,7 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../components/ui/card';
 import guitarImage from '../assets/guitarImage.png';
 import { useNavigate } from 'react-router-dom';
-import { LOCATIONS, formatPrice } from '../config/terms';
+import { LOCATIONS, formatPrice, isPlaceholderPriceId } from '../config/terms';
 import type { Location } from '../config/terms';
 
 export function Pricing() {
@@ -25,13 +25,17 @@ export function Pricing() {
   };
 
   const handleBuy = async (packageId: string) => {
+    const stripePriceId = activeTerm.stripePriceIds[packageId];
+    if (isPlaceholderPriceId(stripePriceId)) {
+      return;
+    }
+
     if (!user) {
       navigate('/login');
       return;
     }
 
     const pkg = activeLocation.packages.find(p => p.id === packageId)!;
-    const stripePriceId = activeTerm.stripePriceIds[packageId];
     setLoading(packageId);
     try {
       const token = await user.getIdToken();
@@ -158,7 +162,7 @@ export function Pricing() {
                   className="w-full h-48 object-contain"
                 />
               </CardContent>
-              <CardFooter>
+              <CardFooter className="flex-col items-stretch gap-2">
                 <Button
                   className={`w-full ${
                     pkg.popular
@@ -166,10 +170,19 @@ export function Pricing() {
                       : 'bg-stone-900 text-white hover:bg-stone-800'
                   }`}
                   onClick={() => handleBuy(pkg.id)}
-                  disabled={loading === pkg.id}
+                  disabled={loading === pkg.id || isPlaceholderPriceId(activeTerm.stripePriceIds[pkg.id])}
                 >
-                  {loading === pkg.id ? 'Processing...' : 'Buy Now'}
+                  {loading === pkg.id
+                    ? 'Processing...'
+                    : isPlaceholderPriceId(activeTerm.stripePriceIds[pkg.id])
+                    ? 'Currently Unavailable'
+                    : 'Buy Now'}
                 </Button>
+                {isPlaceholderPriceId(activeTerm.stripePriceIds[pkg.id]) && (
+                  <p className="text-xs text-center text-stone-400">
+                    Online booking for this package isn't set up yet — please contact us.
+                  </p>
+                )}
               </CardFooter>
             </Card>
           ))}

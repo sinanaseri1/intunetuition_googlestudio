@@ -1,13 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
-import { db } from '../firebase';
 import { auth } from '../firebase';
-import { doc, getDoc } from 'firebase/firestore';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import { Checkbox } from '../components/ui/checkbox';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Music, Mail, ArrowLeft } from 'lucide-react';
 
@@ -18,55 +17,87 @@ export function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [childName, setChildName] = useState('');
+  const [yearGroup, setYearGroup] = useState('');
+  const [school, setSchool] = useState('');
+  const [gdprConsent, setGdprConsent] = useState(false);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showResetPassword, setShowResetPassword] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [resetSent, setResetSent] = useState(false);
 
+  // Redirect purely on `profile.role` — never wait on a further async fetch
+  // (e.g. the student document) before navigating, so a slow or failing
+  // Firestore read can never leave a signed-in user stuck on this page.
+  // auth.tsx guarantees `profile` resolves to a usable value (falling back to
+  // role: 'student' on error) once `loading` goes false, so this is a hard
+  // guarantee, not a best-effort one. Any further onboarding gaps (missing
+  // child info, missing GDPR consent — relevant to Google sign-in, which
+  // can't collect either at sign-up) are handled by the destination pages
+  // themselves (Dashboard.tsx bounces to /student-profile or /consent).
   useEffect(() => {
-    let mounted = true;
+    if (!user || !profile || loading) return;
 
-    async function redirectBasedOnProfile() {
-      if (!user || !profile) return;
-
-      if (profile.role === 'admin') {
-        navigate('/admin', { replace: true });
-      } else if (profile.role === 'teacher') {
-        navigate('/teacher', { replace: true });
-      } else if (profile.role === 'student') {
-        const studentDoc = await getDoc(doc(db, 'students', user.uid));
-        if (!mounted) return;
-        if (studentDoc.exists()) {
-          const data = studentDoc.data();
-          if (!data.childName) {
-            navigate('/student-profile', { replace: true });
-          } else if (!data.gdprConsentGiven) {
-            navigate('/consent', { replace: true });
-          } else {
-            navigate('/dashboard', { replace: true });
-          }
-        } else {
-          navigate('/student-profile', { replace: true });
-        }
-      }
+    if (profile.role === 'admin') {
+      navigate('/admin', { replace: true });
+    } else if (profile.role === 'teacher') {
+      navigate('/teacher', { replace: true });
+    } else {
+      navigate('/dashboard', { replace: true });
     }
-
-    if (user && profile && !loading) {
-      redirectBasedOnProfile();
-    }
-
-    return () => { mounted = false; };
   }, [user, profile, loading, navigate]);
+
+  // Belt-and-suspenders: if something upstream still hangs (e.g. `loading`
+  // itself never resolves), never leave the user stranded on the login page.
+  useEffect(() => {
+    if (!user || loading) return;
+    const timeoutId = window.setTimeout(() => {
+      navigate('/dashboard', { replace: true });
+    }, 6000);
+    return () => window.clearTimeout(timeoutId);
+  }, [user, loading, navigate]);
+
+  const PHONE_PATTERN = /^[0-9+()\-\s]{7,20}$/;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (isSignUp) {
+      if (!phone.trim() || !PHONE_PATTERN.test(phone.trim())) {
+        setError('Please enter a valid phone number.');
+        return;
+      }
+      if (!childName.trim()) {
+        setError("Please enter your child's name.");
+        return;
+      }
+      if (!yearGroup.trim()) {
+        setError('Please enter your child\'s year group.');
+        return;
+      }
+      if (!school.trim()) {
+        setError("Please enter your child's school.");
+        return;
+      }
+      if (!gdprConsent) {
+        setError('You must give consent to process your data to sign up.');
+        return;
+      }
+    }
+
     setIsSubmitting(true);
-    
+
     try {
       if (isSignUp) {
-        await signUpWithEmail(email, password, name);
+        await signUpWithEmail(email, password, name, {
+          phone: phone.trim(),
+          childName: childName.trim(),
+          yearGroup: yearGroup.trim(),
+          school: school.trim(),
+        });
       } else {
         await signInWithEmail(email, password);
       }
@@ -200,11 +231,11 @@ export function Login() {
               <form onSubmit={handleSubmit} className="space-y-4">
                 {isSignUp && (
                   <div className="space-y-2">
-                    <Label htmlFor="name">Full Name</Label>
-                    <Input 
-                      id="name" 
-                      type="text" 
-                      placeholder="John Doe" 
+                    <Label htmlFor="name">Full Name (Parent/Guardian)</Label>
+                    <Input
+                      id="name"
+                      type="text"
+                      placeholder="John Doe"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       required={isSignUp}
@@ -224,16 +255,85 @@ export function Login() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="password">Password</Label>
-                  <Input 
-                    id="password" 
-                    type="password" 
+                  <Input
+                    id="password"
+                    type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     minLength={6}
                   />
                 </div>
-                
+
+                {isSignUp && (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="phone">Phone Number</Label>
+                      <Input
+                        id="phone"
+                        type="tel"
+                        placeholder="e.g. 07123 456789"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="pt-2 border-t border-stone-200">
+                      <p className="text-sm font-medium text-stone-700 mb-3">Your Child's Details</p>
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="childName">Child's Name</Label>
+                          <Input
+                            id="childName"
+                            type="text"
+                            placeholder="Enter your child's full name"
+                            value={childName}
+                            onChange={(e) => setChildName(e.target.value)}
+                            required
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="yearGroup">Year Group</Label>
+                          <Input
+                            id="yearGroup"
+                            type="text"
+                            placeholder="e.g. Year 3, Year 4"
+                            value={yearGroup}
+                            onChange={(e) => setYearGroup(e.target.value)}
+                            required
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="school">School</Label>
+                          <Input
+                            id="school"
+                            type="text"
+                            placeholder="Enter your child's school name"
+                            value={school}
+                            onChange={(e) => setSchool(e.target.value)}
+                            required
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-3 p-3 bg-stone-50 rounded-lg">
+                      <Checkbox
+                        id="gdprConsent"
+                        checked={gdprConsent}
+                        onCheckedChange={(checked) => setGdprConsent(checked as boolean)}
+                        className="mt-1"
+                      />
+                      <Label htmlFor="gdprConsent" className="text-sm leading-relaxed font-normal">
+                        I give consent for In Tune Tuition to process my and my child's personal data as described in the{' '}
+                        <Link to="/privacy-policy" className="text-[#b9d9a1] hover:underline font-medium" target="_blank">
+                          Privacy Policy
+                        </Link>
+                        . I can withdraw this consent at any time by contacting info@intunetuition.co.uk.
+                      </Label>
+                    </div>
+                  </>
+                )}
+
                 {error && (
                   <div className="text-sm text-red-500 font-medium p-2 bg-red-50 rounded-md">
                     {error}

@@ -1,7 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../lib/auth';
-import { db } from '../firebase';
-import { doc, getDoc } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Download, Copy, CheckCircle2, User, Phone, Mail, Calendar } from 'lucide-react';
@@ -9,19 +7,31 @@ import { format } from 'date-fns';
 import { Link } from 'react-router-dom';
 
 export function MyData() {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [studentData, setStudentData] = useState<any>(null);
+  const [exportPayload, setExportPayload] = useState<any>(null);
   const [copied, setCopied] = useState(false);
+
+  const profile = exportPayload?.account ?? null;
+  const studentData = exportPayload?.student ?? null;
+  const bookings: any[] = exportPayload?.bookings ?? [];
 
   useEffect(() => {
     async function fetchData() {
       if (!user) return;
-      
+
       try {
-        const studentDoc = await getDoc(doc(db, 'students', user.uid));
-        if (studentDoc.exists()) {
-          setStudentData(studentDoc.data());
+        // Fetches from the same /api/export-data endpoint used for the JSON
+        // export below, so the page always shows exactly what gets exported
+        // (including bookings, which a separate client-side read used to omit).
+        const token = await user.getIdToken();
+        const response = await fetch('/api/export-data', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (response.ok) {
+          setExportPayload(await response.json());
+        } else {
+          console.error('Error fetching user data:', await response.text());
         }
       } catch (error) {
         console.error("Error fetching user data:", error);
@@ -29,35 +39,13 @@ export function MyData() {
         setLoading(false);
       }
     }
-    
+
     fetchData();
   }, [user]);
 
   const exportData = () => {
-    const data = {
-      exportDate: new Date().toISOString(),
-      account: profile ? {
-        email: profile.email,
-        name: profile.name,
-        role: profile.role,
-        createdAt: profile.createdAt,
-        updatedAt: profile.updatedAt
-      } : null,
-      student: studentData ? {
-        childName: studentData.childName,
-        yearGroup: studentData.yearGroup,
-        school: studentData.school,
-        phone: studentData.phone,
-        creditsRemaining: studentData.creditsRemaining,
-        gdprConsent: {
-          given: studentData.gdprConsentGiven,
-          date: studentData.gdprConsentDate,
-          version: studentData.gdprConsentVersion
-        }
-      } : null
-    };
-
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    if (!exportPayload) return;
+    const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -69,30 +57,8 @@ export function MyData() {
   };
 
   const copyToClipboard = () => {
-    const data = {
-      exportDate: new Date().toISOString(),
-      account: profile ? {
-        email: profile.email,
-        name: profile.name,
-        role: profile.role,
-        createdAt: profile.createdAt,
-        updatedAt: profile.updatedAt
-      } : null,
-      student: studentData ? {
-        childName: studentData.childName,
-        yearGroup: studentData.yearGroup,
-        school: studentData.school,
-        phone: studentData.phone,
-        creditsRemaining: studentData.creditsRemaining,
-        gdprConsent: {
-          given: studentData.gdprConsentGiven,
-          date: studentData.gdprConsentDate,
-          version: studentData.gdprConsentVersion
-        }
-      } : null
-    };
-
-    navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+    if (!exportPayload) return;
+    navigator.clipboard.writeText(JSON.stringify(exportPayload, null, 2));
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -229,6 +195,32 @@ export function MyData() {
                   <p className="font-medium text-stone-900">{studentData?.gdprConsentVersion || 'N/A'}</p>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-[#b9d9a1]" />
+                Booking History
+              </CardTitle>
+              <CardDescription>Lessons you've booked, and their status</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {bookings.length > 0 ? (
+                <ul className="divide-y divide-stone-100">
+                  {bookings.map((b: any) => (
+                    <li key={b.id} className="py-2 flex items-center justify-between text-sm">
+                      <span className="text-stone-600">
+                        Booked {b.bookedAt ? format(new Date(b.bookedAt), 'MMMM d, yyyy') : 'N/A'}
+                      </span>
+                      <span className="font-medium text-stone-900 capitalize">{b.status?.replace('_', ' ')}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-stone-500">No bookings on file.</p>
+              )}
             </CardContent>
           </Card>
 

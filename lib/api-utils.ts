@@ -35,12 +35,27 @@ export class AuthError extends Error {
   }
 }
 
+function isStripeMissingPriceError(error: unknown): boolean {
+  return (
+    !!error &&
+    typeof error === 'object' &&
+    (error as { type?: string }).type === 'StripeInvalidRequestError' &&
+    (error as { code?: string }).code === 'resource_missing' &&
+    typeof (error as { param?: string }).param === 'string' &&
+    (error as { param?: string }).param!.includes('price')
+  );
+}
+
 export function sanitizeError(error: unknown, defaultMsg = 'An internal error occurred') {
   if (error instanceof AuthError) {
     return { status: 401 as const, message: 'Authentication required' };
   }
   if (error instanceof z.ZodError) {
     return { status: 400 as const, message: error.errors[0]?.message || 'Invalid input' };
+  }
+  if (isStripeMissingPriceError(error)) {
+    console.error('Stripe price lookup failed (likely unsynced price ID):', error);
+    return { status: 400 as const, message: 'This package is not currently available for purchase. Please contact us.' };
   }
   console.error('Server error:', error);
   return { status: 500 as const, message: defaultMsg };
