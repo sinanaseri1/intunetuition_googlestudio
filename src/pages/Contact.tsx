@@ -4,7 +4,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
-import { Mail, Phone, MapPin, Send } from 'lucide-react';
+import { Mail, Send } from 'lucide-react';
 import { toast } from 'sonner';
 
 const CONTACT_EMAIL = 'info@intunetuition.co.uk';
@@ -56,27 +56,12 @@ export function Contact() {
                       <p className="text-sm text-stone-500 mt-1">We aim to reply within 24 hours.</p>
                     </div>
                   </div>
-                  
-                  <div className="flex items-start gap-4">
-                    <div className="bg-[#b9d9a1] p-3 rounded-full">
-                      <Phone className="w-6 h-6 text-stone-900" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-stone-900">Phone</h3>
-                      <p className="text-stone-600 mt-1">01234 567890</p>
-                      <p className="text-sm text-stone-500 mt-1">Mon-Fri from 9am to 5pm.</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-start gap-4">
-                    <div className="bg-[#b9d9a1] p-3 rounded-full">
-                      <MapPin className="w-6 h-6 text-stone-900" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-stone-900">Office</h3>
-                      <p className="text-stone-600 mt-1">123 Music Lane<br />London, UK<br />SW1A 1AA</p>
-                    </div>
-                  </div>
+
+                  <a href={`mailto:${CONTACT_EMAIL}`} className="block">
+                    <Button className="w-full bg-[#b9d9a1] text-stone-900 hover:bg-[#a5c58d]">
+                      <Mail className="w-4 h-4 mr-2" /> Email Us Directly
+                    </Button>
+                  </a>
                 </div>
               </CardContent>
             </Card>
