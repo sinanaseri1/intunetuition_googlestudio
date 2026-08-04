@@ -1,51 +1,118 @@
+import { useState } from 'react';
 import { Outlet, Link } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { Button } from './ui/button';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
+import { Menu } from 'lucide-react';
 import { Logo } from './Logo';
 import { CookieConsent } from './CookieConsent';
 
 export function Layout() {
   const { user, profile, logout } = useAuth();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  // Single source of truth for both the desktop bar and the mobile drawer, so
+  // a link can never be added to one and forgotten in the other.
+  const navLinks: { to: string; label: string }[] = [
+    { to: '/', label: 'Home' },
+    { to: '/pricing', label: 'Pricing' },
+    { to: '/testimonials', label: 'Testimonials' },
+    { to: '/contact', label: 'Contact' },
+    ...(profile?.role === 'student'
+      ? [
+          { to: '/dashboard', label: 'Dashboard' },
+          { to: '/my-data', label: 'My Data' },
+        ]
+      : []),
+    ...(profile?.role === 'teacher' ? [{ to: '/teacher', label: 'Teacher Portal' }] : []),
+    ...(profile?.role === 'admin' ? [{ to: '/admin', label: 'Admin' }] : []),
+  ];
 
   return (
     <div className="min-h-screen flex flex-col bg-stone-50 text-stone-900 font-sans">
       <header className="bg-white border-b border-stone-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-32 items-center">
-            <Link to="/" className="flex items-center">
-              <Logo className="h-28 w-auto" />
+          <div className="flex justify-between h-24 md:h-32 items-center gap-4">
+            <Link to="/" className="flex items-center shrink-0">
+              <Logo className="h-20 md:h-28 w-auto" />
             </Link>
-            
+
             <nav className="hidden md:flex items-center gap-6">
-              <Link to="/" className="text-sm font-medium text-stone-600 hover:text-stone-900">Home</Link>
-              <Link to="/pricing" className="text-sm font-medium text-stone-600 hover:text-stone-900">Pricing</Link>
-              <Link to="/testimonials" className="text-sm font-medium text-stone-600 hover:text-stone-900">Testimonials</Link>
-              <Link to="/contact" className="text-sm font-medium text-stone-600 hover:text-stone-900">Contact</Link>
-              {profile?.role === 'student' && (
-                <>
-                  <Link to="/dashboard" className="text-sm font-medium text-stone-600 hover:text-stone-900">Dashboard</Link>
-                  <Link to="/my-data" className="text-sm font-medium text-stone-600 hover:text-stone-900">My Data</Link>
-                </>
-              )}
-              {profile?.role === 'teacher' && (
-                <Link to="/teacher" className="text-sm font-medium text-stone-600 hover:text-stone-900">Teacher Portal</Link>
-              )}
-              {profile?.role === 'admin' && (
-                <Link to="/admin" className="text-sm font-medium text-stone-600 hover:text-stone-900">Admin</Link>
-              )}
+              {navLinks.map((link) => (
+                <Link
+                  key={link.to}
+                  to={link.to}
+                  className="text-sm font-medium text-stone-600 hover:text-stone-900"
+                >
+                  {link.label}
+                </Link>
+              ))}
             </nav>
 
-            <div className="flex items-center gap-4">
-              {user ? (
-                <div className="flex items-center gap-4">
-                  <span className="text-sm text-stone-500 hidden sm:inline-block">{profile?.name}</span>
-                  <Button variant="outline" size="sm" onClick={logout}>Sign Out</Button>
-                </div>
-              ) : (
-                <Link to="/login">
-                  <Button className="bg-[#b9d9a1] text-stone-900 hover:bg-[#a5c58d]">Sign In</Button>
-                </Link>
-              )}
+            <div className="flex items-center gap-3">
+              <div className="hidden md:flex items-center gap-4">
+                {user ? (
+                  <>
+                    <span className="text-sm text-stone-500 hidden lg:inline-block">{profile?.name}</span>
+                    <Button variant="outline" size="sm" onClick={logout}>Sign Out</Button>
+                  </>
+                ) : (
+                  <Link to="/login">
+                    <Button className="bg-[#b9d9a1] text-stone-900 hover:bg-[#a5c58d]">Sign In</Button>
+                  </Link>
+                )}
+              </div>
+
+              {/* Mobile: the nav and auth actions above are hidden below md, so
+                  everything moves into this drawer rather than disappearing. */}
+              <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
+                <SheetTrigger
+                  render={
+                    <Button variant="outline" size="icon" className="md:hidden" aria-label="Open menu" />
+                  }
+                >
+                  <Menu className="h-5 w-5" />
+                </SheetTrigger>
+                <SheetContent side="right" className="w-[85%] max-w-xs">
+                  <SheetHeader className="border-b border-stone-200">
+                    <SheetTitle>{user ? profile?.name || 'Menu' : 'Menu'}</SheetTitle>
+                  </SheetHeader>
+
+                  <nav className="flex flex-col px-2">
+                    {navLinks.map((link) => (
+                      <Link
+                        key={link.to}
+                        to={link.to}
+                        onClick={() => setMobileNavOpen(false)}
+                        className="rounded-md px-3 py-3 text-base font-medium text-stone-700 hover:bg-stone-100 hover:text-stone-900"
+                      >
+                        {link.label}
+                      </Link>
+                    ))}
+                  </nav>
+
+                  <div className="mt-auto border-t border-stone-200 p-4">
+                    {user ? (
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => {
+                          setMobileNavOpen(false);
+                          logout();
+                        }}
+                      >
+                        Sign Out
+                      </Button>
+                    ) : (
+                      <Link to="/login" onClick={() => setMobileNavOpen(false)} className="block">
+                        <Button className="w-full bg-[#b9d9a1] text-stone-900 hover:bg-[#a5c58d]">
+                          Sign In
+                        </Button>
+                      </Link>
+                    )}
+                  </div>
+                </SheetContent>
+              </Sheet>
             </div>
           </div>
         </div>

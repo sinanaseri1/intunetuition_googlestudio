@@ -14,9 +14,11 @@ You will need to enter these into Vercel. Keep this list handy.
 **Secret Backend Keys (Keep these hidden):**
 *   `GEMINI_API_KEY`: Your Google Gemini API key (from Google AI Studio).
 *   `STRIPE_SECRET_KEY`: Your Stripe secret key (from Stripe Dashboard > Developers > API keys).
-*   `STRIPE_WEBHOOK_SECRET`: Your Stripe webhook signing secret (from Stripe Dashboard > Developers > Webhooks > your endpoint). **Required for payment processing to update Firestore.**
-*   `FIREBASE_SERVICE_ACCOUNT`: The full JSON of your Firebase service account (from Firebase Console > Project Settings > Service Accounts > Generate new private key). Paste as a single-line JSON string. **Required for Stripe webhook credit updates, account anonymization, and data export.**
-*   `APP_URL`: The final production URL of your Vercel app (e.g., `https://your-app-name.vercel.app`). *Note: You will set this after Vercel generates your URL.*
+*   `STRIPE_WEBHOOK_SECRETS`: Comma-separated Stripe webhook signing secrets — one per registered endpoint (from Stripe Dashboard > Developers > Webhooks > each endpoint). **Required for payment processing to update Firestore.** `STRIPE_WEBHOOK_SECRET` (singular) still works for a single endpoint.
+*   `FIREBASE_SERVICE_ACCOUNT`: The full JSON of your Firebase service account (from Firebase Console > Project Settings > Service Accounts > Generate new private key). Paste as a single-line JSON string. **Required for Stripe webhook credit updates, account anonymization, data export, and the admin User Management list.**
+*   `APP_URLS`: Comma-separated list of every domain this deployment serves, no trailing slashes — for this project:
+    `https://intunetuition.co.uk,https://intunetuition-googlestudio.vercel.app`
+    Drives CORS and Stripe success/cancel URLs, so a checkout started on either domain returns to that same domain. The first entry is the fallback when a request's origin isn't recognised. `APP_URL` (singular) is still honoured for single-domain setups.
 
 **Public Frontend Keys (From your Firebase Console or `firebase-applet-config.json`):**
 *   `VITE_FIREBASE_API_KEY`
@@ -63,15 +65,19 @@ To ensure payments correctly update student credits and package history:
 
 1. Go to Stripe Dashboard > Developers > Webhooks.
 2. Click **Add endpoint**.
-3. Set the endpoint URL to `https://your-app-name.vercel.app/api/webhook`.
+3. Set the endpoint URL to `https://intunetuition.co.uk/api/webhook`.
 4. Select these events:
    - `checkout.session.completed`
    - `customer.subscription.created`
    - `customer.subscription.updated`
    - `customer.subscription.deleted`
 5. Click **Add endpoint**.
-6. Copy the **Signing secret** (starts with `whsec_...`) and add it as `STRIPE_WEBHOOK_SECRET` in Vercel.
-7. Redeploy your Vercel project so the server picks up the new variable.
+6. Copy the **Signing secret** (starts with `whsec_...`).
+7. *(Optional)* Repeat steps 2–6 for `https://intunetuition-googlestudio.vercel.app/api/webhook` if you want events delivered to the Vercel domain too.
+8. Put every signing secret you collected into `STRIPE_WEBHOOK_SECRETS` in Vercel as a comma-separated list — each incoming event is verified against them in turn, so both endpoints work.
+9. Redeploy your Vercel project so the server picks up the new variable.
+
+*One endpoint is enough:* both domains hit the same deployment, so a single webhook endpoint on your primary domain will process payments made from either. Register the second only if you want redundancy.
 
 ## 6. Deploying to Vercel
 1. Go to [Vercel](https://vercel.com/) and log in with your GitHub account.
@@ -85,13 +91,15 @@ To ensure payments correctly update student credits and package history:
 6. Add every single key and value from **Step 2**.
 7. Click **Deploy**.
 
-## 7. Post-Deployment: Update Stripe & APP_URL
-Once Vercel finishes deploying, it will give you your live production URL (e.g., `https://my-awesome-app.vercel.app`).
+## 7. Post-Deployment: Domains, Stripe & Price IDs
 
-1. **Update Vercel:** Go back to your Vercel Project Settings > Environment Variables. Add or update the `APP_URL` variable to be your exact new Vercel URL (including `https://`, but no trailing slash).
-2. **Redeploy:** Go to the "Deployments" tab in Vercel, click the three dots next to your latest deployment, and select **Redeploy** so the server picks up the new `APP_URL`.
-3. **Update Stripe Webhooks:** If you set up webhooks in Step 5, ensure the endpoint URL matches your production URL.
-4. **Sync real Stripe price IDs:** `src/config/terms.ts` ships with placeholder price IDs (e.g. `price_NOTT_AUT1_STD`) that Stripe will reject. Run `npm run prices:create` (needs `STRIPE_SECRET_KEY` in your local `.env`) to create the real Products/Prices in your Stripe account and rewrite `terms.ts` with the live IDs, then commit and redeploy. Until this is done, the pricing page shows "Currently Unavailable" instead of letting anyone attempt checkout.
+1. **Set `APP_URLS`:** In Vercel Project Settings > Environment Variables, set `APP_URLS` to every domain the app serves, comma-separated, no trailing slashes:
+   `https://intunetuition.co.uk,https://intunetuition-googlestudio.vercel.app`
+   Both domains must be listed, or checkout redirects and CORS will fail on the missing one.
+2. **Authorize both domains in Firebase:** Repeat Step 3 for *each* domain (`intunetuition.co.uk` and `intunetuition-googlestudio.vercel.app`), otherwise Google sign-in fails with "Unauthorized Domain" on whichever is missing.
+3. **Redeploy** so the server picks up the new variables.
+4. **Update Stripe Webhooks:** Ensure the endpoint URL(s) from Step 5 match your live domains.
+5. **Sync real Stripe price IDs:** `src/config/terms.ts` ships with placeholder price IDs (e.g. `price_NOTT_AUT1_STD`) that Stripe will reject. Run `npm run prices:create` (needs `STRIPE_SECRET_KEY` in your local `.env`) to create the real Products/Prices and rewrite `terms.ts`, then commit and redeploy. The script prints whether it ran in **TEST** or **LIVE** mode — switching keys and re-running regenerates the IDs for that account. Until this is done, the pricing page shows "Currently Unavailable" instead of letting anyone attempt checkout.
 
 Your app is now live, secure, and fully functional!
 
@@ -100,7 +108,7 @@ Your app is now live, secure, and fully functional!
 This app uses **Vercel serverless functions** for all API routes (in the `api/` directory). The `server.ts` file is only used for local development with Vite's middleware mode. All production API traffic goes through Vercel's serverless infrastructure.
 
 Key security features:
-- **CORS** restricted to `APP_URL`
+- **CORS** restricted to the origins listed in `APP_URLS` (or `APP_URL`); redirect targets are validated against the same allowlist, so a spoofed `Origin` header can't redirect a buyer off-site
 - **Input validation** via Zod schemas on all endpoints
 - **Error sanitization** — internal errors never leak to clients
 - **Stripe webhook signature verification** prevents fake payment events

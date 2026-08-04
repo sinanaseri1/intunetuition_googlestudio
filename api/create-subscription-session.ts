@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Stripe from 'stripe';
-import { handleCors, subscriptionSchema, sanitizeError, safeJsonResponse, verifyAuthToken } from '../lib/api-utils';
+import { handleCors, subscriptionSchema, sanitizeError, safeJsonResponse, verifyAuthToken, resolveAppUrl } from '../lib/api-utils';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   handleCors(req, res);
@@ -33,6 +33,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
+    const appUrl = resolveAppUrl(req.headers);
+    if (!appUrl) {
+      return safeJsonResponse(res, 500, { error: 'Application URL is not configured' });
+    }
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [
@@ -42,8 +47,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         },
       ],
       mode: 'subscription',
-      success_url: `${process.env.APP_URL}/dashboard?session_id={CHECKOUT_SESSION_ID}&subscription_success=true`,
-      cancel_url: `${process.env.APP_URL}/dashboard?canceled=true`,
+      success_url: `${appUrl}/dashboard?session_id={CHECKOUT_SESSION_ID}&subscription_success=true`,
+      cancel_url: `${appUrl}/dashboard?canceled=true`,
       metadata: {
         studentId,
         planName: planName || '',

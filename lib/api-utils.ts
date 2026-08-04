@@ -1,12 +1,80 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import type { IncomingHttpHeaders } from 'node:http';
 import { z } from 'zod';
-import { verifyIdToken } from './firebase-admin';
+import { verifyIdToken, getAdminFirestore } from './firebase-admin';
 import type { DecodedIdToken } from 'firebase-admin/auth';
 
+function stripTrailingSlash(value: string): string {
+  return value.replace(/\/+$/, '');
+}
+
+/**
+ * Every origin this deployment is allowed to serve, in priority order.
+ *
+ * Set APP_URLS to a comma-separated list to run the same deployment behind
+ * more than one domain (e.g. the Vercel URL plus the custom domain). APP_URL
+ * remains supported as the single-origin fallback so existing deployments
+ * keep working unchanged.
+ */
+export function getAllowedOrigins(): string[] {
+  const raw = process.env.APP_URLS || process.env.APP_URL || '';
+  return raw
+    .split(',')
+    .map((value) => stripTrailingSlash(value.trim()))
+    .filter(Boolean);
+}
+
+/**
+ * Picks the origin to build absolute URLs with (Stripe success/cancel links).
+ *
+ * Hardcoding a single APP_URL sends someone who checked out on domain A back
+ * to domain B, where they are not signed in. So we echo back the caller's own
+ * origin — but only ever one from the allowlist, since these values land in
+ * redirect URLs and an unvalidated header would be an open redirect.
+ */
+export function resolveAppUrl(headers: IncomingHttpHeaders): string {
+  const allowed = getAllowedOrigins();
+  if (allowed.length === 0) return '';
+
+  const origin = typeof headers.origin === 'string' ? stripTrailingSlash(headers.origin) : '';
+  if (origin && allowed.includes(origin)) return origin;
+
+  // Same-origin requests may omit Origin; fall back to the forwarded host.
+  const forwardedHost = headers['x-forwarded-host'] || headers.host;
+  const host = Array.isArray(forwardedHost) ? forwardedHost[0] : forwardedHost;
+  if (host) {
+    const forwardedProto = headers['x-forwarded-proto'];
+    const proto = (Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto) || 'https';
+    const candidate = stripTrailingSlash(`${proto}://${host}`);
+    if (allowed.includes(candidate)) return candidate;
+  }
+
+  return allowed[0];
+}
+
+/**
+ * Stripe signing secrets to accept. Registering one webhook endpoint per
+ * domain in Stripe yields a distinct secret for each, so accept a
+ * comma-separated list via STRIPE_WEBHOOK_SECRETS; STRIPE_WEBHOOK_SECRET
+ * stays supported for single-endpoint setups.
+ */
+export function getWebhookSecrets(): string[] {
+  const raw = process.env.STRIPE_WEBHOOK_SECRETS || process.env.STRIPE_WEBHOOK_SECRET || '';
+  return raw
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
 export function corsHeaders(origin?: string) {
-  const allowedOrigin = process.env.APP_URL || '*';
+  const allowed = getAllowedOrigins();
+  const normalized = origin ? stripTrailingSlash(origin) : '';
+  const allowOrigin = allowed.length === 0
+    ? '*'
+    : (normalized && allowed.includes(normalized) ? normalized : allowed[0]);
+
   return {
-    'Access-Control-Allow-Origin': origin && (allowedOrigin === '*' || origin === allowedOrigin) ? origin : allowedOrigin,
+    'Access-Control-Allow-Origin': allowOrigin,
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Max-Age': '86400',
@@ -14,18 +82,17 @@ export function corsHeaders(origin?: string) {
 }
 
 export function handleCors(req: VercelRequest, res: VercelResponse) {
-  if (req.method === 'OPTIONS') {
-    res.setHeader('Access-Control-Allow-Origin', corsHeaders(req.headers.origin)['Access-Control-Allow-Origin']);
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    res.setHeader('Access-Control-Max-Age', '86400');
-    return res.status(204).end();
-  }
   const headers = corsHeaders(req.headers.origin);
   res.setHeader('Access-Control-Allow-Origin', headers['Access-Control-Allow-Origin']);
   res.setHeader('Access-Control-Allow-Methods', headers['Access-Control-Allow-Methods']);
   res.setHeader('Access-Control-Allow-Headers', headers['Access-Control-Allow-Headers']);
   res.setHeader('Access-Control-Max-Age', headers['Access-Control-Max-Age']);
+  // The allowed origin now varies per request, so caches must key on it.
+  res.setHeader('Vary', 'Origin');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
 }
 
 export class AuthError extends Error {
@@ -46,6 +113,15 @@ export class ServerConfigError extends Error {
   }
 }
 
+// Authenticated, but not permitted — 403 rather than 401, so the client knows
+// re-authenticating won't help.
+export class ForbiddenError extends Error {
+  constructor(message = 'Forbidden') {
+    super(message);
+    this.name = 'ForbiddenError';
+  }
+}
+
 function isStripeMissingPriceError(error: unknown): boolean {
   return (
     !!error &&
@@ -60,6 +136,9 @@ function isStripeMissingPriceError(error: unknown): boolean {
 export function sanitizeError(error: unknown, defaultMsg = 'An internal error occurred') {
   if (error instanceof AuthError) {
     return { status: 401 as const, message: 'Authentication required' };
+  }
+  if (error instanceof ForbiddenError) {
+    return { status: 403 as const, message: error.message };
   }
   if (error instanceof ServerConfigError) {
     console.error('Server configuration error:', error.message);
@@ -98,6 +177,28 @@ export async function verifyAuthToken(req: VercelRequest): Promise<DecodedIdToke
   } catch {
     throw new AuthError();
   }
+}
+
+/**
+ * Verifies the caller is signed in AND holds the admin role.
+ *
+ * Role lives on the Firestore user document (never on the client), so this is
+ * the server-side equivalent of firestore.rules' isAdmin(). Any endpoint that
+ * exposes data across all users must gate on this, not just verifyAuthToken.
+ */
+export async function verifyAdminToken(req: VercelRequest): Promise<DecodedIdToken> {
+  const decodedToken = await verifyAuthToken(req);
+  // Reading another user's document needs real Admin credentials, not the
+  // projectId-only app that token verification alone can run on. Say so
+  // explicitly rather than surfacing an opaque Firestore credential error.
+  if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
+    throw new ServerConfigError('FIREBASE_SERVICE_ACCOUNT is required for admin operations');
+  }
+  const userDoc = await getAdminFirestore().collection('users').doc(decodedToken.uid).get();
+  if (!userDoc.exists || userDoc.data()?.role !== 'admin') {
+    throw new ForbiddenError('Admin access required');
+  }
+  return decodedToken;
 }
 
 export function requireEnv(name: string): string {
