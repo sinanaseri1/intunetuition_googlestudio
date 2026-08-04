@@ -8,8 +8,10 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
-import { Users, BookOpen, Calendar, Settings, Plus, Edit, Trash2, Shield, Download, AlertTriangle } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../components/ui/dialog';
+import { Users, BookOpen, Calendar, Settings, Plus, Edit, Trash2, Shield, Download, AlertTriangle, Eye } from 'lucide-react';
 import { format } from 'date-fns';
+import { formatPrice } from '../config/terms';
 
 export function AdminDashboard() {
   const { user } = useAuth();
@@ -18,7 +20,9 @@ export function AdminDashboard() {
   const [students, setStudents] = useState<any[]>([]);
   const [teachers, setTeachers] = useState<any[]>([]);
   const [slots, setSlots] = useState<any[]>([]);
+  const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [viewingStudent, setViewingStudent] = useState<any | null>(null);
 
   // Form states
   const [newPackage, setNewPackage] = useState({ name: '', priceGbp: 0, lessons: 0, groupSize: '', description: '', isActive: true });
@@ -41,19 +45,21 @@ export function AdminDashboard() {
       
       const st = allUsersData.filter((u: any) => u.role === 'student');
       const te = allUsersData.filter((u: any) => u.role === 'teacher');
-      
-      // Fetch student details
-      const studentsWithDetails = await Promise.all(st.map(async (s: any) => {
-        const sDoc = await getDocs(query(collection(db, 'students')));
-        const sData = sDoc.docs.find(d => d.id === s.id)?.data();
-        return { ...s, details: sData };
-      }));
+
+      // Fetch student details (one query for the whole collection, then match in memory)
+      const studentDocsSnapshot = await getDocs(collection(db, 'students'));
+      const studentDetailsById = new Map(studentDocsSnapshot.docs.map(d => [d.id, d.data()]));
+      const studentsWithDetails = st.map((s: any) => ({ ...s, details: studentDetailsById.get(s.id) }));
       setStudents(studentsWithDetails);
       setTeachers(te);
 
       // Fetch slots
       const slotsSnapshot = await getDocs(collection(db, 'lessonSlots'));
       setSlots(slotsSnapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+
+      // Fetch all bookings so admins can see booking status per student
+      const bookingsSnapshot = await getDocs(collection(db, 'bookings'));
+      setBookings(bookingsSnapshot.docs.map(d => ({ id: d.id, ...d.data() })));
 
     } catch (error) {
       console.error("Error fetching admin data:", error);
@@ -370,7 +376,10 @@ export function AdminDashboard() {
                           {student.details?.creditsRemaining || 0}
                         </span>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="space-x-2">
+                        <Button variant="outline" size="sm" className="text-stone-600" onClick={() => setViewingStudent(student)}>
+                          <Eye className="w-4 h-4 mr-1" /> View Details
+                        </Button>
                         <Button variant="outline" size="sm" className="text-stone-600">
                           <Edit className="w-4 h-4 mr-1" /> Adjust Credits
                         </Button>
@@ -416,7 +425,8 @@ export function AdminDashboard() {
                           className="flex h-8 w-[130px] rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                           value={u.role}
                           onChange={(e) => handleRoleChange(u.id, e.target.value)}
-                          disabled={u.email === 'Info@intunetuition.co.uk'} // Protect the super admin
+                          disabled={u.id === user?.uid} // Admins can't change their own role, to avoid accidental self-lockout
+                          title={u.id === user?.uid ? "You can't change your own role" : undefined}
                         >
                           <option value="student">Student</option>
                           <option value="teacher">Teacher</option>
@@ -554,6 +564,116 @@ export function AdminDashboard() {
           </div>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={!!viewingStudent} onOpenChange={(open) => { if (!open) setViewingStudent(null); }}>
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+          {viewingStudent && (
+            <>
+              <DialogHeader>
+                <DialogTitle>{viewingStudent.name}</DialogTitle>
+                <DialogDescription>{viewingStudent.email}</DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-sm font-semibold text-stone-900 mb-2">Student Profile</h3>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <p className="text-stone-500">Child's Name</p>
+                      <p className="font-medium text-stone-900">{viewingStudent.details?.childName || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-stone-500">Year Group</p>
+                      <p className="font-medium text-stone-900">{viewingStudent.details?.yearGroup || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-stone-500">School</p>
+                      <p className="font-medium text-stone-900">{viewingStudent.details?.school || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-stone-500">Phone</p>
+                      <p className="font-medium text-stone-900">{viewingStudent.details?.phone || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-stone-500">Credits Remaining</p>
+                      <p className="font-medium text-stone-900">{viewingStudent.details?.creditsRemaining ?? 0}</p>
+                    </div>
+                    <div>
+                      <p className="text-stone-500">GDPR Consent</p>
+                      <p className="font-medium text-stone-900">
+                        {viewingStudent.details?.gdprConsentGiven ? `Given ${viewingStudent.details?.gdprConsentDate ? format(new Date(viewingStudent.details.gdprConsentDate), 'MMM do, yyyy') : ''}` : 'Not given'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-semibold text-stone-900 mb-2">Bookings</h3>
+                  {bookings.filter(b => b.studentId === viewingStudent.id).length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Lesson Slot</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Booked</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {bookings.filter(b => b.studentId === viewingStudent.id).map(b => {
+                          const slot = slots.find(s => s.id === b.lessonSlotId);
+                          return (
+                            <TableRow key={b.id}>
+                              <TableCell>
+                                {slot ? `${format(new Date(slot.startTime), 'MMM do, yyyy, h:mm a')} · ${slot.location}` : 'Unknown slot'}
+                              </TableCell>
+                              <TableCell className="capitalize">{b.status?.replace('_', ' ')}</TableCell>
+                              <TableCell>{b.bookedAt ? format(new Date(b.bookedAt), 'MMM do, yyyy') : 'N/A'}</TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <p className="text-sm text-stone-500">No bookings on record.</p>
+                  )}
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-semibold text-stone-900 mb-2">Payment History</h3>
+                  {(viewingStudent.details?.packageHistory || []).length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Package</TableHead>
+                          <TableHead>Credits</TableHead>
+                          <TableHead>Amount</TableHead>
+                          <TableHead>Purchased</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {[...(viewingStudent.details?.packageHistory || [])]
+                          .sort((a: any, b: any) => new Date(b.purchasedAt).getTime() - new Date(a.purchasedAt).getTime())
+                          .map((entry: any, i: number) => (
+                            <TableRow key={entry.sessionId || i}>
+                              <TableCell>{entry.planName || entry.packageId}</TableCell>
+                              <TableCell>{entry.credits}</TableCell>
+                              <TableCell>{entry.amountTotal != null ? formatPrice(entry.amountTotal) : '—'}</TableCell>
+                              <TableCell>{entry.purchasedAt ? format(new Date(entry.purchasedAt), 'MMM do, yyyy') : 'N/A'}</TableCell>
+                            </TableRow>
+                          ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <p className="text-sm text-stone-500">No purchases on record.</p>
+                  )}
+                </div>
+              </div>
+
+              <DialogFooter showCloseButton />
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

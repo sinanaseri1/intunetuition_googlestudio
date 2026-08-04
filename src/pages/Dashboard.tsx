@@ -75,13 +75,21 @@ export function Dashboard() {
         }
       }
       
-      // Check if student profile is complete
+      // Check if student profile is complete. Login.tsx no longer pre-checks this
+      // itself (to avoid hanging the login redirect on an extra Firestore read),
+      // so this is the actual enforcement point for both onboarding steps —
+      // relevant mainly to Google sign-in, which can't collect child details or
+      // GDPR consent at account creation the way the email/password form now does.
       if (profile?.role === 'student') {
         const studentDoc = await getDoc(doc(db, 'students', user.uid));
         if (studentDoc.exists()) {
           const data = studentDoc.data();
           if (!data.childName) {
             navigate('/student-profile');
+            return;
+          }
+          if (!data.gdprConsentGiven) {
+            navigate('/consent');
             return;
           }
         } else {

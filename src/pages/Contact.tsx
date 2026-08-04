@@ -7,8 +7,9 @@ import { Textarea } from '../components/ui/textarea';
 import { Mail, Phone, MapPin, Send } from 'lucide-react';
 import { toast } from 'sonner';
 
+const CONTACT_EMAIL = 'info@intunetuition.co.uk';
+
 export function Contact() {
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -16,16 +17,15 @@ export function Contact() {
     message: ''
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
-    
-    // Simulate sending an email
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    toast.success('Message sent successfully! We will get back to you soon.');
-    setFormData({ name: '', email: '', subject: '', message: '' });
-    setIsSubmitting(false);
+
+    const subject = formData.subject || `Message from ${formData.name}`;
+    const body = `${formData.message}\n\n—\nFrom: ${formData.name} (${formData.email})`;
+    const mailtoUrl = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+    window.location.href = mailtoUrl;
+    toast.success("Opening your email client — just hit send when you're ready.");
   };
 
   return (
@@ -52,7 +52,7 @@ export function Contact() {
                     </div>
                     <div>
                       <h3 className="font-semibold text-stone-900">Email</h3>
-                      <p className="text-stone-600 mt-1">hello@intunetuition.com</p>
+                      <p className="text-stone-600 mt-1">{CONTACT_EMAIL}</p>
                       <p className="text-sm text-stone-500 mt-1">We aim to reply within 24 hours.</p>
                     </div>
                   </div>
@@ -137,16 +137,11 @@ export function Contact() {
                     />
                   </div>
                   
-                  <Button 
-                    type="submit" 
+                  <Button
+                    type="submit"
                     className="w-full bg-stone-900 text-white hover:bg-stone-800"
-                    disabled={isSubmitting}
                   >
-                    {isSubmitting ? 'Sending...' : (
-                      <>
-                        <Send className="w-4 h-4 mr-2" /> Send Message
-                      </>
-                    )}
+                    <Send className="w-4 h-4 mr-2" /> Send Message
                   </Button>
                 </form>
               </CardContent>

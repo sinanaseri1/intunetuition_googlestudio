@@ -16,7 +16,6 @@ You will need to enter these into Vercel. Keep this list handy.
 *   `STRIPE_SECRET_KEY`: Your Stripe secret key (from Stripe Dashboard > Developers > API keys).
 *   `STRIPE_WEBHOOK_SECRET`: Your Stripe webhook signing secret (from Stripe Dashboard > Developers > Webhooks > your endpoint). **Required for payment processing to update Firestore.**
 *   `FIREBASE_SERVICE_ACCOUNT`: The full JSON of your Firebase service account (from Firebase Console > Project Settings > Service Accounts > Generate new private key). Paste as a single-line JSON string. **Required for Stripe webhook credit updates, account anonymization, and data export.**
-*   `VITE_ADMIN_EMAIL`: Email address that gets admin access (must match the email in `firestore.rules`).
 *   `APP_URL`: The final production URL of your Vercel app (e.g., `https://your-app-name.vercel.app`). *Note: You will set this after Vercel generates your URL.*
 
 **Public Frontend Keys (From your Firebase Console or `firebase-applet-config.json`):**
@@ -42,16 +41,22 @@ By default, Firebase Authentication only allows logins from `localhost` and your
 
 *If you skip this step, users will get an "Unauthorized Domain" error when trying to log in.*
 
-## 4. Configure Admin Email
-Admin access is controlled by email address. Make sure `VITE_ADMIN_EMAIL` in Vercel matches the email hardcoded in `firestore.rules`. If you need to change the admin email, update both places.
+## 4. Bootstrap the First Admin
+Admin access is **role-based**: any user whose `users/{uid}` document has `role: 'admin'` in Firestore can access `/admin` and is treated as an admin by `firestore.rules` (`isAdmin()` checks this field, not an email). There is no env var for this — it's intentionally not possible to self-assign admin on sign-up, since that would let anyone claim admin by controlling an env var.
+
+To create the first admin after deploying:
+1. Sign up normally through the app (you'll land as a regular `student`).
+2. In the Firebase Console, go to **Firestore Database** → the `ai-studio-...` database → `users` collection → your user document → edit the `role` field to `admin`.
+3. Sign out and back in (or refresh) — you'll now see the Admin Dashboard.
+4. From then on, promote/demote any other user's role from the Admin Dashboard's **Users & Roles** tab — no more manual Firestore edits needed, and you can have as many admins as you like.
 
 ## 4a. CRITICAL: Publish Firestore Security Rules
 Sign-up and login fail with "Missing or insufficient permissions" until the repo's `firestore.rules` are published to the custom database (`ai-studio-62953b58-6116-498b-9d65-2c51621042f0`). Either:
 
 - **Firebase Console (no CLI):** Firestore Database → select the `ai-studio-...` database → Rules tab → paste the full contents of `firestore.rules` → Publish.
-- **Firebase CLI:** install with `npm i -g firebase-tools`, then run `firebase login` and `firebase deploy --only firestore:rules` (config already in `firebase.json`/`.firebaserc`).
+- **Firebase CLI:** install with `npm i -g firebase-tools`, then run `firebase login` and `firebase deploy --only firestore:rules` (`firebase.json` now pins the `database` field to the `ai-studio-...` database, so this deploys to the right place).
 
-Verify after publishing: a new sign-up should create `users/{uid}` and `students/{uid}` docs.
+Verify after publishing: a new sign-up should create `users/{uid}` and `students/{uid}` docs (check the browser console for `permission-denied` errors if it doesn't).
 
 ## 5. Set Up Stripe Webhooks
 To ensure payments correctly update student credits and package history:
@@ -86,7 +91,7 @@ Once Vercel finishes deploying, it will give you your live production URL (e.g.,
 1. **Update Vercel:** Go back to your Vercel Project Settings > Environment Variables. Add or update the `APP_URL` variable to be your exact new Vercel URL (including `https://`, but no trailing slash).
 2. **Redeploy:** Go to the "Deployments" tab in Vercel, click the three dots next to your latest deployment, and select **Redeploy** so the server picks up the new `APP_URL`.
 3. **Update Stripe Webhooks:** If you set up webhooks in Step 5, ensure the endpoint URL matches your production URL.
-4. **Verify Admin Email:** Ensure `VITE_ADMIN_EMAIL` in Vercel matches the email in `firestore.rules`.
+4. **Sync real Stripe price IDs:** `src/config/terms.ts` ships with placeholder price IDs (e.g. `price_NOTT_AUT1_STD`) that Stripe will reject. Run `npm run prices:create` (needs `STRIPE_SECRET_KEY` in your local `.env`) to create the real Products/Prices in your Stripe account and rewrite `terms.ts` with the live IDs, then commit and redeploy. Until this is done, the pricing page shows "Currently Unavailable" instead of letting anyone attempt checkout.
 
 Your app is now live, secure, and fully functional!
 
@@ -99,6 +104,6 @@ Key security features:
 - **Input validation** via Zod schemas on all endpoints
 - **Error sanitization** — internal errors never leak to clients
 - **Stripe webhook signature verification** prevents fake payment events
-- **Admin access** controlled via email matching (env var + firestore.rules)
+- **Admin access** controlled via a `role` field on the user's Firestore document, enforced server-side by `firestore.rules`
 - **Security headers** (HSTS, X-Frame-Options, X-Content-Type-Options, etc.)
 - **Gemini API key** proxied through backend — never exposed to the client
