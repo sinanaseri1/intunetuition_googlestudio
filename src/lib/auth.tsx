@@ -105,11 +105,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setUser(firebaseUser);
-      if (firebaseUser) {
-        try {
-          const finalProfile = await runTransaction(db, async (transaction) => {
+    // Creates (or heals) the Firestore profile for whoever just signed in.
+    // Runs for *every* registration path — email/password and Google OAuth
+    // alike — because it hangs off onAuthStateChanged rather than off any one
+    // sign-in call, so no provider can bypass profile creation.
+    const syncUserProfile = async (firebaseUser: FirebaseUser): Promise<UserProfile> =>
+      runTransaction(db, async (transaction) => {
             const userDocRef = doc(db, 'users', firebaseUser.uid);
             const userDoc = await transaction.get(userDocRef);
             const studentDocRef = doc(db, 'students', firebaseUser.uid);
@@ -173,18 +174,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
               return newProfile;
             }
-          });
-          setProfile(finalProfile);
-        } catch (error) {
+      });
+
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setUser(firebaseUser);
+      if (!firebaseUser) {
+        setProfile(null);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setProfile(await syncUserProfile(firebaseUser));
+      } catch (error) {
+        // A failed profile write leaves an account that can sign in but is
+        // invisible to the admin User Management list, so retry once for
+        // transient failures (network blip, contention) before giving up.
+        console.error('Error creating user profile, retrying once:', error);
+        try {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          setProfile(await syncUserProfile(firebaseUser));
+        } catch (retryError) {
           // Never leave a signed-in user stuck with profile=null (e.g. Firestore
-          // rules not yet deployed, a transient network error, or a genuinely
-          // corrupt document) — fall back to a usable in-memory student profile
-          // so redirect logic elsewhere always has something to act on.
-          console.error("Error fetching/creating user profile, using fallback:", error);
+          // rules not yet deployed, or a genuinely corrupt document) — fall back
+          // to a usable in-memory student profile so redirect logic elsewhere
+          // always has something to act on. The account still shows up in admin
+          // User Management (sourced from Firebase Auth) flagged "No profile".
+          console.error('Error fetching/creating user profile, using fallback:', retryError);
           setProfile(fallbackProfile(firebaseUser));
         }
-      } else {
-        setProfile(null);
       }
       setLoading(false);
     });

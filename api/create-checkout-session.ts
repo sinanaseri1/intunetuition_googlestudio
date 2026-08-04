@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Stripe from 'stripe';
-import { handleCors, checkoutSchema, sanitizeError, safeJsonResponse, verifyAuthToken } from '../lib/api-utils';
+import { handleCors, checkoutSchema, sanitizeError, safeJsonResponse, verifyAuthToken, resolveAppUrl } from '../lib/api-utils';
+import { resolvePackageByPriceId } from '../lib/package-catalog';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   handleCors(req, res);
@@ -21,10 +22,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return safeJsonResponse(res, 400, { error: validation.error.errors[0]?.message || 'Invalid input' });
     }
 
-    const { priceId, studentId, packageId, credits, location, planName } = validation.data;
+    const { priceId, studentId } = validation.data;
 
     if (studentId !== decodedToken.uid) {
       return safeJsonResponse(res, 403, { error: 'Forbidden: cannot checkout for another account' });
+    }
+
+    // Never trust packageId/credits/location/planName from the client for
+    // this metadata — the webhook credits creditsRemaining based on exactly
+    // what ends up here, so it must be derived from priceId server-side
+    // (see lib/package-catalog.ts), not accepted as-is from the request body.
+    const resolvedPackage = resolvePackageByPriceId(priceId);
+    if (!resolvedPackage) {
+      return safeJsonResponse(res, 400, { error: 'Unknown package' });
     }
 
     if (!process.env.STRIPE_SECRET_KEY) {
@@ -32,6 +42,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+    // Return the buyer to whichever allowed domain they started on, so they
+    // don't land on a domain where their session isn't signed in.
+    const appUrl = resolveAppUrl(req.headers);
+    if (!appUrl) {
+      return safeJsonResponse(res, 500, { error: 'Application URL is not configured' });
+    }
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
@@ -42,14 +59,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         },
       ],
       mode: 'payment',
-      success_url: `${process.env.APP_URL}/dashboard?session_id={CHECKOUT_SESSION_ID}&success=true`,
-      cancel_url: `${process.env.APP_URL}/dashboard?canceled=true`,
+      success_url: `${appUrl}/dashboard?session_id={CHECKOUT_SESSION_ID}&success=true`,
+      cancel_url: `${appUrl}/dashboard?canceled=true`,
       metadata: {
         studentId,
-        packageId: packageId || '',
-        credits: credits?.toString() || '',
-        location: location || '',
-        planName: planName || '',
+        packageId: resolvedPackage.packageId,
+        credits: resolvedPackage.credits.toString(),
+        location: resolvedPackage.location,
+        planName: resolvedPackage.planName,
       },
     });
 

@@ -34,6 +34,10 @@ export function getAdminFirestore(): FirebaseFirestore.Firestore {
   return getFirestore(app, databaseId);
 }
 
+export function getAdminAuth() {
+  return getAuth(getAdminApp());
+}
+
 export function verifyIdToken(idToken: string) {
   return getAuth(getAdminApp()).verifyIdToken(idToken);
 }

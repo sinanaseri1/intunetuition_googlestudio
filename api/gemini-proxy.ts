@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenAI } from '@google/genai';
-import { handleCors, sanitizeError, safeJsonResponse, requireEnv } from '../lib/api-utils';
+import { handleCors, sanitizeError, safeJsonResponse, requireEnv, verifyAuthToken } from '../lib/api-utils';
 
 const geminiSchema = {
   type: 'object' as const,
@@ -23,6 +23,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    // Unauthenticated callers could otherwise burn the project's Gemini quota
+    // for free — this endpoint is currently unused by the client, but lock it
+    // down rather than leave a live, unmetered proxy to a paid API sitting
+    // exposed at a guessable URL.
+    await verifyAuthToken(req);
+
     const apiKey = requireEnv('GEMINI_API_KEY');
     const ai = new GoogleGenAI({ apiKey });
 

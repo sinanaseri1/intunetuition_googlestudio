@@ -2,7 +2,8 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Stripe from 'stripe';
 import admin from 'firebase-admin';
 import { getAdminFirestore } from '../lib/firebase-admin';
-import { handleCors, safeJsonResponse } from '../lib/api-utils';
+import { handleCors, safeJsonResponse, getWebhookSecrets } from '../lib/api-utils';
+import { constructStripeEvent } from '../lib/stripe-webhook';
 
 let stripe: Stripe | null = null;
 
@@ -43,9 +44,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return safeJsonResponse(res, 400, { error: 'Missing Stripe signature' });
   }
 
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-  if (!webhookSecret) {
-    console.error('STRIPE_WEBHOOK_SECRET not configured');
+  if (getWebhookSecrets().length === 0) {
+    console.error('No Stripe webhook signing secret configured (STRIPE_WEBHOOK_SECRET / STRIPE_WEBHOOK_SECRETS)');
     return safeJsonResponse(res, 500, { error: 'Webhook not configured' });
   }
 
@@ -57,7 +57,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   let event: Stripe.Event;
   try {
     const rawBody = await getRawBody(req);
-    event = getStripe().webhooks.constructEvent(rawBody, sig, webhookSecret);
+    event = constructStripeEvent(getStripe(), rawBody, sig);
   } catch (error) {
     console.error('Stripe webhook signature verification failed:', error);
     return safeJsonResponse(res, 400, { error: 'Invalid signature' });

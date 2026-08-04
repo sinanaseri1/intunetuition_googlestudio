@@ -4,7 +4,20 @@ import { createServer as createViteServer } from 'vite';
 import Stripe from "stripe";
 import admin from "firebase-admin";
 import { getAdminFirestore, verifyIdToken } from './lib/firebase-admin';
-import { checkoutSchema, subscriptionSchema, anonymizeSchema, sanitizeError, AuthError, ServerConfigError } from './lib/api-utils';
+import {
+  checkoutSchema,
+  subscriptionSchema,
+  anonymizeSchema,
+  sanitizeError,
+  AuthError,
+  ServerConfigError,
+  ForbiddenError,
+  getWebhookSecrets,
+  resolveAppUrl,
+} from './lib/api-utils';
+import { resolvePackageByPriceId } from './lib/package-catalog';
+import { constructStripeEvent } from './lib/stripe-webhook';
+import { listAllUsers, backfillUserProfile } from './lib/admin-users';
 
 async function startServer() {
   const app = express();
@@ -14,13 +27,12 @@ async function startServer() {
   // is preserved for Stripe signature verification.
   app.post("/api/webhook", express.raw({ type: () => true }), async (req, res) => {
     const sig = req.headers["stripe-signature"];
-    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
     if (!sig || typeof sig !== "string") {
       return res.status(400).json({ error: "Missing Stripe signature" });
     }
-    if (!webhookSecret) {
-      console.error("STRIPE_WEBHOOK_SECRET not configured");
+    if (getWebhookSecrets().length === 0) {
+      console.error("No Stripe webhook signing secret configured (STRIPE_WEBHOOK_SECRET / STRIPE_WEBHOOK_SECRETS)");
       return res.status(500).json({ error: "Webhook not configured" });
     }
     if (!process.env.STRIPE_SECRET_KEY) {
@@ -33,7 +45,7 @@ async function startServer() {
     let event: Stripe.Event;
     try {
       const rawBody = Buffer.isBuffer(req.body) ? req.body.toString("utf8") : String(req.body ?? "");
-      event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
+      event = constructStripeEvent(stripe, rawBody, sig);
     } catch (error) {
       console.error("Stripe webhook signature verification failed:", error);
       return res.status(400).json({ error: "Invalid signature" });
@@ -138,6 +150,44 @@ async function startServer() {
     }
   }
 
+  // Mirrors verifyAdminToken() in lib/api-utils.ts: role lives on the Firestore
+  // user document, never on the client.
+  async function requireAdminId(req: express.Request): Promise<string> {
+    const uid = await requireUserId(req);
+    if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
+      throw new ServerConfigError("FIREBASE_SERVICE_ACCOUNT is required for admin operations");
+    }
+    const userDoc = await getAdminFirestore().collection("users").doc(uid).get();
+    if (!userDoc.exists || userDoc.data()?.role !== "admin") {
+      throw new ForbiddenError("Admin access required");
+    }
+    return uid;
+  }
+
+  app.get("/api/admin/users", async (req, res) => {
+    try {
+      await requireAdminId(req);
+      res.json({ users: await listAllUsers() });
+    } catch (error) {
+      const { status, message } = sanitizeError(error, "Failed to load users");
+      res.status(status).json({ error: message });
+    }
+  });
+
+  app.post("/api/admin/users", async (req, res) => {
+    try {
+      await requireAdminId(req);
+      const uid = typeof req.body?.uid === "string" ? req.body.uid.trim() : "";
+      if (!uid) {
+        return res.status(400).json({ error: "uid is required" });
+      }
+      res.json({ user: await backfillUserProfile(uid) });
+    } catch (error) {
+      const { status, message } = sanitizeError(error, "Failed to create user profile");
+      res.status(status).json({ error: message });
+    }
+  });
+
   app.post("/api/create-checkout-session", async (req, res) => {
     try {
       const uid = await requireUserId(req);
@@ -146,10 +196,18 @@ async function startServer() {
         return res.status(400).json({ error: validation.error.errors[0]?.message || "Invalid input" });
       }
 
-      const { priceId, studentId, packageId, credits, location, planName } = validation.data;
+      const { priceId, studentId } = validation.data;
 
       if (studentId !== uid) {
         return res.status(403).json({ error: "Forbidden: cannot checkout for another account" });
+      }
+
+      // See lib/package-catalog.ts — never trust packageId/credits/location/
+      // planName from the client, since the webhook credits creditsRemaining
+      // based on exactly what ends up in this metadata.
+      const resolvedPackage = resolvePackageByPriceId(priceId);
+      if (!resolvedPackage) {
+        return res.status(400).json({ error: "Unknown package" });
       }
 
       if (!process.env.STRIPE_SECRET_KEY) {
@@ -157,6 +215,11 @@ async function startServer() {
       }
 
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+      const appUrl = resolveAppUrl(req.headers);
+      if (!appUrl) {
+        return res.status(500).json({ error: "Application URL is not configured" });
+      }
 
       const session = await stripe.checkout.sessions.create({
         payment_method_types: ["card"],
@@ -167,14 +230,14 @@ async function startServer() {
           },
         ],
         mode: "payment",
-        success_url: `${process.env.APP_URL}/dashboard?session_id={CHECKOUT_SESSION_ID}&success=true`,
-        cancel_url: `${process.env.APP_URL}/dashboard?canceled=true`,
+        success_url: `${appUrl}/dashboard?session_id={CHECKOUT_SESSION_ID}&success=true`,
+        cancel_url: `${appUrl}/dashboard?canceled=true`,
         metadata: {
           studentId,
-          packageId: packageId || "",
-          credits: credits?.toString() || "",
-          location: location || "",
-          planName: planName || "",
+          packageId: resolvedPackage.packageId,
+          credits: resolvedPackage.credits.toString(),
+          location: resolvedPackage.location,
+          planName: resolvedPackage.planName,
         },
       });
 
@@ -205,6 +268,11 @@ async function startServer() {
 
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
+      const appUrl = resolveAppUrl(req.headers);
+      if (!appUrl) {
+        return res.status(500).json({ error: "Application URL is not configured" });
+      }
+
       const session = await stripe.checkout.sessions.create({
         payment_method_types: ["card"],
         line_items: [
@@ -214,8 +282,8 @@ async function startServer() {
           },
         ],
         mode: "subscription",
-        success_url: `${process.env.APP_URL}/dashboard?session_id={CHECKOUT_SESSION_ID}&subscription_success=true`,
-        cancel_url: `${process.env.APP_URL}/dashboard?canceled=true`,
+        success_url: `${appUrl}/dashboard?session_id={CHECKOUT_SESSION_ID}&subscription_success=true`,
+        cancel_url: `${appUrl}/dashboard?canceled=true`,
         metadata: {
           studentId,
           planName: planName || "",
@@ -302,13 +370,6 @@ async function startServer() {
       const { status, message } = sanitizeError(error);
       res.status(status).json({ error: message });
     }
-  });
-
-  app.get("/api/admin/users-without-consent", async (req, res) => {
-    res.json({
-      users: [],
-      message: "Admin endpoint - requires admin authentication in production",
-    });
   });
 
   const vite = await createViteServer({

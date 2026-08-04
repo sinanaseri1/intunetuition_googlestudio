@@ -23,6 +23,11 @@ export function AdminDashboard() {
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewingStudent, setViewingStudent] = useState<any | null>(null);
+  // Set when the Auth-backed user list is unavailable (e.g. no service account
+  // configured), so the UI can say the list may be incomplete rather than
+  // quietly showing a partial roster.
+  const [userSyncWarning, setUserSyncWarning] = useState<string | null>(null);
+  const [backfillingUid, setBackfillingUid] = useState<string | null>(null);
 
   // Form states
   const [newPackage, setNewPackage] = useState({ name: '', priceGbp: 0, lessons: 0, groupSize: '', description: '', isActive: true });
@@ -32,6 +37,37 @@ export function AdminDashboard() {
     fetchData();
   }, [user]);
 
+  /**
+   * Loads the roster from the Auth-backed admin endpoint, which includes users
+   * who can sign in but have no Firestore profile document. Falls back to the
+   * Firestore-only view (which silently omits those users) if the endpoint is
+   * unavailable, flagging the list as possibly incomplete rather than failing.
+   */
+  async function fetchAllUsers(): Promise<any[]> {
+    try {
+      if (!user) throw new Error('Not signed in');
+      const token = await user.getIdToken();
+      const response = await fetch('/api/admin/users', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setUserSyncWarning(null);
+        return data.users || [];
+      }
+      const body = await response.json().catch(() => ({}));
+      setUserSyncWarning(
+        body.error || `Could not reach the account directory (HTTP ${response.status}).`
+      );
+    } catch (error) {
+      console.error('Error loading users from admin endpoint:', error);
+      setUserSyncWarning('Could not reach the account directory.');
+    }
+
+    const usersSnapshot = await getDocs(collection(db, 'users'));
+    return usersSnapshot.docs.map(d => ({ id: d.id, hasProfile: true, hasAuthAccount: true, ...d.data() }));
+  }
+
   async function fetchData() {
     try {
       // Fetch packages
@@ -39,10 +75,9 @@ export function AdminDashboard() {
       setPackages(pkgsSnapshot.docs.map(d => ({ id: d.id, ...d.data() })));
 
       // Fetch users
-      const usersSnapshot = await getDocs(collection(db, 'users'));
-      const allUsersData = usersSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      const allUsersData = await fetchAllUsers();
       setAllUsers(allUsersData);
-      
+
       const st = allUsersData.filter((u: any) => u.role === 'student');
       const te = allUsersData.filter((u: any) => u.role === 'teacher');
 
@@ -67,6 +102,37 @@ export function AdminDashboard() {
       setLoading(false);
     }
   }
+
+  /**
+   * Creates the missing Firestore profile for an Auth-only account. Must go
+   * through the server: firestore.rules only lets a user create their own
+   * profile document, so an admin can't repair someone else's from the client.
+   */
+  const handleBackfillProfile = async (userId: string) => {
+    if (!user) return;
+    setBackfillingUid(userId);
+    try {
+      const token = await user.getIdToken();
+      const response = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ uid: userId }),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error || `Request failed (HTTP ${response.status})`);
+      }
+      await fetchData();
+    } catch (error: any) {
+      console.error('Error creating user profile:', error);
+      alert(`Failed to create profile: ${error.message}`);
+    } finally {
+      setBackfillingUid(null);
+    }
+  };
 
   const handleRoleChange = async (userId: string, newRole: string) => {
     try {
@@ -359,7 +425,7 @@ export function AdminDashboard() {
                     <TableRow key={student.id}>
                       <TableCell className="font-medium">{student.name}</TableCell>
                       <TableCell>{student.email}</TableCell>
-                      <TableCell>{format(new Date(student.createdAt), 'MMM do, yyyy')}</TableCell>
+                      <TableCell>{student.createdAt ? format(new Date(student.createdAt), 'MMM do, yyyy') : '—'}</TableCell>
                       <TableCell>
                         {(student.details?.creditsRemaining || 0) > 0 ? (
                           <span className="inline-flex items-center justify-center bg-green-100 text-green-800 px-2.5 py-0.5 rounded-full text-xs font-medium">
@@ -395,46 +461,94 @@ export function AdminDashboard() {
           <Card>
             <CardHeader>
               <CardTitle>User Management</CardTitle>
-              <CardDescription>Manage roles and permissions for all users</CardDescription>
+              <CardDescription>
+                Every registered account, including sign-ins that never completed a profile
+              </CardDescription>
             </CardHeader>
             <CardContent>
+              {userSyncWarning && (
+                <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <div>
+                    <p className="font-medium">This list may be incomplete.</p>
+                    <p className="mt-1 text-amber-800">
+                      {userSyncWarning} Showing accounts with a saved profile only — anyone who
+                      signed in but has no profile record won't appear.
+                    </p>
+                  </div>
+                </div>
+              )}
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Email</TableHead>
+                    <TableHead>Sign-in</TableHead>
                     <TableHead>Current Role</TableHead>
                     <TableHead>Change Role</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {allUsers.map(u => (
-                    <TableRow key={u.id}>
-                      <TableCell className="font-medium">{u.name}</TableCell>
-                      <TableCell>{u.email}</TableCell>
-                      <TableCell>
-                        <span className={`inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize
-                          ${u.role === 'admin' ? 'bg-purple-100 text-purple-800' :
-                            u.role === 'teacher' ? 'bg-blue-100 text-blue-800' :
-                            'bg-stone-100 text-stone-800'}`}>
-                          {u.role}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <select
-                          className="flex h-8 w-[130px] rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                          value={u.role}
-                          onChange={(e) => handleRoleChange(u.id, e.target.value)}
-                          disabled={u.id === user?.uid} // Admins can't change their own role, to avoid accidental self-lockout
-                          title={u.id === user?.uid ? "You can't change your own role" : undefined}
-                        >
-                          <option value="student">Student</option>
-                          <option value="teacher">Teacher</option>
-                          <option value="admin">Admin</option>
-                        </select>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {allUsers.map(u => {
+                    const missingProfile = u.hasProfile === false;
+                    return (
+                      <TableRow key={u.id}>
+                        <TableCell className="font-medium">
+                          {u.name || <span className="text-stone-400">—</span>}
+                        </TableCell>
+                        <TableCell>{u.email}</TableCell>
+                        <TableCell className="text-sm text-stone-500">
+                          {u.providers?.length
+                            ? u.providers.map((p: string) => p.replace('.com', '')).join(', ')
+                            : '—'}
+                          {u.hasAuthAccount === false && (
+                            <span className="ml-2 inline-flex items-center rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-600">
+                              No sign-in account
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {missingProfile ? (
+                            <span className="inline-flex items-center justify-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
+                              No profile
+                            </span>
+                          ) : (
+                            <span className={`inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize
+                              ${u.role === 'admin' ? 'bg-purple-100 text-purple-800' :
+                                u.role === 'teacher' ? 'bg-blue-100 text-blue-800' :
+                                'bg-stone-100 text-stone-800'}`}>
+                              {u.role}
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {missingProfile ? (
+                            // Roles live on the profile document, so it has to exist first.
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleBackfillProfile(u.id)}
+                              disabled={backfillingUid === u.id}
+                            >
+                              {backfillingUid === u.id ? 'Creating…' : 'Create Profile'}
+                            </Button>
+                          ) : (
+                            <select
+                              className="flex h-8 w-[130px] rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                              value={u.role}
+                              onChange={(e) => handleRoleChange(u.id, e.target.value)}
+                              disabled={u.id === user?.uid} // Admins can't change their own role, to avoid accidental self-lockout
+                              title={u.id === user?.uid ? "You can't change your own role" : undefined}
+                            >
+                              <option value="student">Student</option>
+                              <option value="teacher">Teacher</option>
+                              <option value="admin">Admin</option>
+                            </select>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </CardContent>
@@ -502,7 +616,7 @@ export function AdminDashboard() {
                           <TableCell className="font-medium">{student.name}</TableCell>
                           <TableCell>{student.details?.childName || 'N/A'}</TableCell>
                           <TableCell>{student.email}</TableCell>
-                          <TableCell>{format(new Date(student.createdAt), 'MMM do, yyyy')}</TableCell>
+                          <TableCell>{student.createdAt ? format(new Date(student.createdAt), 'MMM do, yyyy') : '—'}</TableCell>
                           <TableCell>
                             <Button variant="outline" size="sm" className="text-stone-600">
                               Send Consent Reminder
