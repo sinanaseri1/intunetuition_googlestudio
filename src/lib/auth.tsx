@@ -10,7 +10,7 @@ import {
   createUserWithEmailAndPassword,
   updateProfile
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, runTransaction } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 
 export type UserRole = 'student' | 'teacher' | 'admin';
 const VALID_ROLES: UserRole[] = ['student', 'teacher', 'admin'];
@@ -60,6 +60,14 @@ interface AuthContextType {
   user: FirebaseUser | null;
   profile: UserProfile | null;
   loading: boolean;
+  /**
+   * Set when the profile could not be read from Firestore and `profile` is a
+   * least-privilege placeholder rather than the real record. Surfaced in the UI
+   * so a privileged user sees "we couldn't load your account" instead of being
+   * silently treated as a student.
+   */
+  profileError: string | null;
+  reloadProfile: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string, name: string, studentDetails: StudentSignUpDetails) => Promise<void>;
@@ -88,6 +96,10 @@ function coerceRole(role: unknown): UserRole {
   return VALID_ROLES.includes(role as UserRole) ? (role as UserRole) : 'student';
 }
 
+// Used ONLY when users/{uid} itself cannot be read — i.e. we genuinely do not
+// know the role. It deliberately assumes the least-privileged role, and callers
+// must pair it with `profileError` so the degraded state is visible rather than
+// looking like a real demotion.
 function fallbackProfile(firebaseUser: FirebaseUser): UserProfile {
   const now = new Date().toISOString();
   return {
@@ -97,6 +109,36 @@ function fallbackProfile(firebaseUser: FirebaseUser): UserProfile {
     createdAt: now,
     updatedAt: now,
   };
+}
+
+/**
+ * Best-effort creation of the students/{uid} scaffold.
+ *
+ * Deliberately separate from profile resolution and deliberately non-fatal.
+ * These two concerns used to share one transaction, which meant a failure to
+ * write this document rolled back the whole thing and pushed the caller onto
+ * fallbackProfile() — silently demoting an admin to 'student'. Role lives in
+ * users/{uid} and must never depend on any other document existing.
+ *
+ * Only students get one: admins and teachers have no use for a credits/package
+ * record, so creating one for them is pure downside.
+ */
+async function ensureStudentRecord(uid: string, role: UserRole): Promise<void> {
+  if (role !== 'student') return;
+  try {
+    const studentDocRef = doc(db, 'students', uid);
+    if (!(await getDoc(studentDocRef)).exists()) {
+      await setDoc(studentDocRef, {
+        userId: uid,
+        creditsRemaining: 0,
+        packageHistory: [],
+      }, { merge: true });
+    }
+  } catch (error) {
+    // Never rethrow: the user is signed in with a valid role either way, and
+    // the pages that need this document create it on demand.
+    console.warn('Could not ensure students record (non-fatal):', error);
+  }
 }
 
 // Held while signUpWithEmail is writing its profile documents.
@@ -113,118 +155,129 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profileError, setProfileError] = useState<string | null>(null);
+
+  /**
+   * Resolves the signed-in user's profile from users/{uid} — the single source
+   * of truth for `role`.
+   *
+   * Reads only. The one write it can make (creating a brand-new profile) is for
+   * users who have no document at all. Nothing about an admin's or teacher's
+   * role can be changed by the state of any other collection, so deleting
+   * students/ or teachers/ can never demote anyone.
+   */
+  const resolveProfile = React.useCallback(async (firebaseUser: FirebaseUser): Promise<UserProfile> => {
+    const userDocRef = doc(db, 'users', firebaseUser.uid);
+    const snapshot = await getDoc(userDocRef);
+    const derivedName = deriveDisplayName(firebaseUser);
+
+    if (snapshot.exists()) {
+      const data = snapshot.data() as Partial<UserProfile>;
+      const role = coerceRole(data.role);
+      const storedName = (data.name || '').trim();
+
+      const resolved: UserProfile = {
+        email: data.email || firebaseUser.email || '',
+        name: storedName || derivedName,
+        role,
+        createdAt: data.createdAt || new Date().toISOString(),
+        updatedAt: data.updatedAt || new Date().toISOString(),
+      };
+
+      // Heal placeholder names left by the sign-up race. Non-fatal by design:
+      // a rejected cosmetic write must never cost the user their real role.
+      // Skipped when the stored role is malformed, since firestore.rules only
+      // lets an owner update their own document when the role is unchanged.
+      const nameNeedsHealing = storedName === '' || storedName === 'New User';
+      if (nameNeedsHealing && role === data.role) {
+        try {
+          const updatedAt = new Date().toISOString();
+          await updateDoc(userDocRef, { name: derivedName, updatedAt });
+          resolved.name = derivedName;
+          resolved.updatedAt = updatedAt;
+        } catch (error) {
+          console.warn('Could not heal display name (non-fatal):', error);
+        }
+      }
+
+      return resolved;
+    }
+
+    // No document at all — a genuinely new account. New accounts always start
+    // as students; admin/teacher access is granted afterwards by an existing
+    // admin, backed by the isAdmin() check in firestore.rules.
+    const now = new Date().toISOString();
+    const newProfile: UserProfile = {
+      email: firebaseUser.email || '',
+      name: derivedName,
+      role: 'student',
+      createdAt: now,
+      updatedAt: now,
+    };
+    await setDoc(userDocRef, newProfile, { merge: true });
+    return newProfile;
+  }, []);
+
+  const applyProfile = React.useCallback(async (firebaseUser: FirebaseUser) => {
+    try {
+      const resolved = await resolveProfile(firebaseUser);
+      setProfile(resolved);
+      setProfileError(null);
+      // Fire-and-forget: cannot affect the role that was just resolved.
+      void ensureStudentRecord(firebaseUser.uid, resolved.role);
+    } catch (error) {
+      console.error('Could not read user profile, retrying once:', error);
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        const resolved = await resolveProfile(firebaseUser);
+        setProfile(resolved);
+        setProfileError(null);
+        void ensureStudentRecord(firebaseUser.uid, resolved.role);
+      } catch (retryError) {
+        // users/{uid} itself is unreadable, so the role is genuinely unknown.
+        // Keep the app navigable with a least-privilege placeholder, but flag
+        // it loudly — this is the only path that can make an admin look like a
+        // student, and it must never pass for a real role change.
+        console.error('Could not read user profile, using placeholder:', retryError);
+        setProfile(fallbackProfile(firebaseUser));
+        setProfileError(
+          retryError instanceof Error && /permission/i.test(retryError.message)
+            ? 'We could not load your account permissions. Some areas may be hidden.'
+            : 'We could not load your account details. Some areas may be hidden.'
+        );
+      }
+    }
+  }, [resolveProfile]);
+
+  const reloadProfile = React.useCallback(async () => {
+    const current = auth.currentUser;
+    if (current) await applyProfile(current);
+  }, [applyProfile]);
 
   useEffect(() => {
-    // Creates (or heals) the Firestore profile for whoever just signed in.
-    // Runs for *every* registration path — email/password and Google OAuth
-    // alike — because it hangs off onAuthStateChanged rather than off any one
-    // sign-in call, so no provider can bypass profile creation.
-    const syncUserProfile = async (firebaseUser: FirebaseUser): Promise<UserProfile> =>
-      runTransaction(db, async (transaction) => {
-            const userDocRef = doc(db, 'users', firebaseUser.uid);
-            const userDoc = await transaction.get(userDocRef);
-            const studentDocRef = doc(db, 'students', firebaseUser.uid);
-            const studentDoc = await transaction.get(studentDocRef);
-
-            const derivedName = deriveDisplayName(firebaseUser);
-
-            if (userDoc.exists()) {
-              const data = userDoc.data() as Partial<UserProfile>;
-              // Ensure students document exists for every user
-              if (!studentDoc.exists()) {
-                transaction.set(studentDocRef, {
-                  userId: firebaseUser.uid,
-                  creditsRemaining: 0,
-                  packageHistory: []
-                }, { merge: true });
-              }
-
-              const role = coerceRole(data.role);
-              const storedName = (data.name || '').trim();
-              const nameNeedsHealing = storedName === '' || storedName === 'New User';
-
-              // Heal placeholder/missing names from the sign-up race so the
-              // stored profile always matches the user's actual name. We only
-              // write back when the role itself is already valid — if the role
-              // is missing/malformed we still return a usable in-memory profile
-              // below, but we don't attempt a Firestore write for it, since
-              // firestore.rules only allows an owner to update their own role
-              // when the new value matches the existing one (an admin has to
-              // fix a genuinely broken role via the Admin Dashboard).
-              if (nameNeedsHealing && role === data.role) {
-                const updatedAt = new Date().toISOString();
-                transaction.update(userDocRef, { name: derivedName, updatedAt });
-                return { ...data, name: derivedName, role, updatedAt } as UserProfile;
-              }
-
-              return {
-                email: data.email || firebaseUser.email || '',
-                name: storedName || derivedName,
-                role,
-                createdAt: data.createdAt || new Date().toISOString(),
-                updatedAt: data.updatedAt || new Date().toISOString(),
-              };
-            } else {
-              // New accounts always start as students. Admin/teacher access is granted
-              // afterwards by an existing admin via the Admin Dashboard's role picker,
-              // which is backed by the isAdmin() role check in firestore.rules.
-              const newProfile: UserProfile = {
-                email: firebaseUser.email || '',
-                name: derivedName,
-                role: 'student',
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-              };
-              transaction.set(userDocRef, newProfile);
-              transaction.set(studentDocRef, {
-                userId: firebaseUser.uid,
-                creditsRemaining: 0,
-                packageHistory: []
-              }, { merge: true });
-
-              return newProfile;
-            }
-      });
-
+    // Hangs off onAuthStateChanged rather than any single sign-in call, so no
+    // provider (email/password or Google OAuth) can bypass profile creation.
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
       if (!firebaseUser) {
         setProfile(null);
+        setProfileError(null);
         setLoading(false);
         return;
       }
 
-      // Let an in-progress sign-up finish writing before syncing, so the two
-      // don't race each other over the same documents.
+      // Let an in-progress sign-up finish writing before resolving, so the two
+      // don't race each other over the same document.
       if (signUpInFlight) {
         await signUpInFlight.catch(() => {});
       }
 
-      try {
-        setProfile(await syncUserProfile(firebaseUser));
-      } catch (error) {
-        // A failed profile write leaves an account that can sign in but is
-        // invisible to the admin User Management list, so retry once for
-        // transient failures (network blip, contention) before giving up.
-        console.error('Error creating user profile, retrying once:', error);
-        try {
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-          setProfile(await syncUserProfile(firebaseUser));
-        } catch (retryError) {
-          // Never leave a signed-in user stuck with profile=null (e.g. Firestore
-          // rules not yet deployed, or a genuinely corrupt document) — fall back
-          // to a usable in-memory student profile so redirect logic elsewhere
-          // always has something to act on. The account still shows up in admin
-          // User Management (sourced from Firebase Auth) flagged "No profile".
-          console.error('Error fetching/creating user profile, using fallback:', retryError);
-          setProfile(fallbackProfile(firebaseUser));
-        }
-      }
+      await applyProfile(firebaseUser);
       setLoading(false);
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [applyProfile]);
 
   const signInWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
@@ -292,7 +345,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signInWithGoogle, signInWithEmail, signUpWithEmail, logout }}>
+    <AuthContext.Provider value={{ user, profile, loading, profileError, reloadProfile, signInWithGoogle, signInWithEmail, signUpWithEmail, logout }}>
       {children}
     </AuthContext.Provider>
   );

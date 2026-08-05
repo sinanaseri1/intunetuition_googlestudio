@@ -181,11 +181,17 @@ export function StudentProfile() {
             </div>
 
             <div className="flex items-start space-x-3 p-4 bg-stone-50 rounded-lg">
-              <Checkbox 
-                id="gdpr" 
+              <Checkbox
+                id="gdpr"
                 checked={formData.gdprConsent}
-                onCheckedChange={(checked) => 
-                  handleInputChange('gdprConsent', checked as boolean ? 'true' : 'false')
+                // Must stay a real boolean. Routing this through
+                // handleInputChange (which is typed for strings) stored the
+                // string 'false' when unchecked — and 'false' is truthy, so the
+                // `if (!formData.gdprConsent)` guard below passed and the app
+                // recorded gdprConsentGiven: true for someone who had not
+                // consented.
+                onCheckedChange={(checked) =>
+                  setFormData((prev) => ({ ...prev, gdprConsent: checked === true }))
                 }
                 className="mt-1"
               />

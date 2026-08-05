@@ -6,6 +6,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './lib/auth';
+import { Button } from './components/ui/button';
 import { Layout } from './components/Layout';
 import { ScrollToTop } from './components/ScrollToTop';
 import { Home } from './pages/Home';
@@ -25,10 +26,10 @@ import { DeleteAccount } from './pages/DeleteAccount';
 import { ConsentFlow } from './pages/ConsentFlow';
 
 function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode, allowedRoles?: string[] }) {
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, profileError, reloadProfile } = useAuth();
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+    return <div className="min-h-screen flex items-center justify-center text-stone-500">Loading…</div>;
   }
 
   if (!user) {
@@ -36,6 +37,26 @@ function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode,
   }
 
   if (allowedRoles && profile && !allowedRoles.includes(profile.role)) {
+    // When the profile couldn't be read, `profile.role` is a least-privilege
+    // placeholder rather than the user's real role. Bouncing them to the home
+    // page here would look exactly like a permission change — so explain what
+    // happened and offer a retry instead of hiding a transient failure.
+    if (profileError) {
+      return (
+        <div className="min-h-[60vh] flex items-center justify-center px-4">
+          <div className="max-w-md w-full rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center">
+            <h1 className="text-lg font-semibold text-amber-900">Couldn’t load your account</h1>
+            <p className="mt-2 text-sm text-amber-800">{profileError}</p>
+            <p className="mt-2 text-sm text-amber-800">
+              This is usually temporary. Your account has not been changed.
+            </p>
+            <Button className="mt-5" variant="outline" onClick={() => { void reloadProfile(); }}>
+              Try again
+            </Button>
+          </div>
+        </div>
+      );
+    }
     return <Navigate to="/" replace />;
   }
 

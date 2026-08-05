@@ -23,25 +23,37 @@ export function Home() {
             className="w-full h-full object-cover"
             referrerPolicy="no-referrer"
           />
-          <div className="absolute inset-0 bg-black/50" />
+          {/* Directional gradient rather than a flat wash: keeps the photo
+              readable on the right while the text side stays high-contrast. */}
+          <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/60 to-black/30" />
+          <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-stone-50 to-transparent" />
         </div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="max-w-2xl">
-            <h1 className="text-5xl md:text-7xl font-bold text-white tracking-tight leading-[1.1] mb-6">
-              Discover the joy of playing guitar.
+            <span className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-4 py-1.5 text-sm font-medium text-white backdrop-blur-sm">
+              <Music className="h-4 w-4" aria-hidden="true" />
+              In-school lessons across Nottingham, Derby &amp; Leicester
+            </span>
+            <h1 className="mt-6 text-5xl md:text-7xl font-bold text-white tracking-tight leading-[1.05] mb-6">
+              Discover the joy of{' '}
+              <span className="bg-gradient-to-r from-[#b9d9a1] to-[#e6f2d8] bg-clip-text text-transparent">
+                playing guitar.
+              </span>
             </h1>
-            <p className="text-xl text-white/90 mb-8 leading-relaxed">
+            <p className="text-xl text-white/90 mb-8 leading-relaxed max-w-xl">
               In Tune Tuition provides engaging, high-quality acoustic guitar lessons for children in primary schools.
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
               <Link to="/login">
-                <Button size="lg" className="w-full sm:w-auto bg-white text-stone-900 hover:bg-white/90 rounded-full px-8">
+                <Button size="lg" className="w-full sm:w-auto bg-white text-stone-900 hover:bg-white/90 rounded-full px-8 shadow-lg shadow-black/20 transition-transform hover:-translate-y-0.5">
                   Book Lessons
                 </Button>
               </Link>
-              <Button size="lg" className="w-full sm:w-auto rounded-full px-8 border-2 border-white bg-transparent text-white hover:bg-white/10">
-                Learn More
-              </Button>
+              <Link to="/pricing">
+                <Button size="lg" className="w-full sm:w-auto rounded-full px-8 border-2 border-white/70 bg-transparent text-white hover:bg-white/10 transition-transform hover:-translate-y-0.5">
+                  View Pricing
+                </Button>
+              </Link>
             </div>
           </div>
         </div>
