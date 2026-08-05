@@ -79,7 +79,17 @@ export function StudentProfile() {
 
     setLoading(true);
     try {
-      await setDoc(doc(db, 'students', user!.uid), {
+      const studentDocRef = doc(db, 'students', user!.uid);
+
+      // creditsRemaining/packageHistory are only safe to write when creating the
+      // document. { merge: true } does NOT protect them — it overwrites — so
+      // including them unconditionally wipes out purchased credits and the whole
+      // purchase history for anyone who reaches this form after buying (which
+      // Dashboard.tsx does automatically whenever childName is missing). Read
+      // first and only seed them when there's nothing there yet.
+      const existing = await getDoc(studentDocRef);
+
+      await setDoc(studentDocRef, {
         userId: user!.uid,
         childName: formData.childName.trim(),
         yearGroup: formData.yearGroup.trim(),
@@ -88,8 +98,7 @@ export function StudentProfile() {
         gdprConsentGiven: true,
         gdprConsentDate: new Date().toISOString(),
         gdprConsentVersion: '1.0',
-        creditsRemaining: 0,
-        packageHistory: []
+        ...(existing.exists() ? {} : { creditsRemaining: 0, packageHistory: [] }),
       }, { merge: true });
 
       // Wait for Firestore to propagate the write before navigating

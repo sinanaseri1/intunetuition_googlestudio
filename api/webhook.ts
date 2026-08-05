@@ -77,33 +77,43 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
           const creditAmount = credits ? parseInt(credits, 10) : 0;
 
-          if (studentDoc.exists) {
-            const history = (studentDoc.data()?.packageHistory as Array<Record<string, unknown>>) || [];
-            const alreadyProcessed = history.some((h) => h.sessionId === session.id);
-            if (alreadyProcessed) {
-              console.log(`Checkout session already processed, skipping: ${session.id}`);
-              return safeJsonResponse(res, 200, { received: true });
-            }
-
-            const updates: Record<string, unknown> = {
-              updatedAt: new Date().toISOString(),
-            };
-            if (creditAmount > 0) {
-              updates.creditsRemaining = admin.firestore.FieldValue.increment(creditAmount);
-            }
-            if (packageId) {
-              updates.packageHistory = admin.firestore.FieldValue.arrayUnion({
-                packageId,
-                location: location || '',
-                planName: planName || '',
-                credits: creditAmount,
-                purchasedAt: new Date().toISOString(),
-                sessionId: session.id,
-                amountTotal: session.amount_total ? session.amount_total / 100 : null,
-              });
-            }
-            await studentDocRef.update(updates);
+          // Idempotency: Stripe retries deliveries, so a replayed event must
+          // never credit twice.
+          const history = (studentDoc.data()?.packageHistory as Array<Record<string, unknown>>) || [];
+          if (history.some((h) => h.sessionId === session.id)) {
+            console.log(`Checkout session already processed, skipping: ${session.id}`);
+            return safeJsonResponse(res, 200, { received: true });
           }
+
+          const updates: Record<string, unknown> = {
+            userId: studentId,
+            updatedAt: new Date().toISOString(),
+          };
+          if (creditAmount > 0) {
+            updates.creditsRemaining = admin.firestore.FieldValue.increment(creditAmount);
+          } else if (!studentDoc.exists) {
+            updates.creditsRemaining = 0;
+          }
+          if (packageId) {
+            updates.packageHistory = admin.firestore.FieldValue.arrayUnion({
+              packageId,
+              location: location || '',
+              planName: planName || '',
+              credits: creditAmount,
+              purchasedAt: new Date().toISOString(),
+              sessionId: session.id,
+              amountTotal: session.amount_total ? session.amount_total / 100 : null,
+            });
+          } else if (!studentDoc.exists) {
+            updates.packageHistory = [];
+          }
+
+          // set+merge rather than update(): a missing student document used to
+          // make this a no-op, so the customer was charged, Stripe received a
+          // 200, and the credits vanished with no retry. increment() and
+          // arrayUnion() both treat an absent field as empty, so this single
+          // call handles the create and update cases identically.
+          await studentDocRef.set(updates, { merge: true });
         }
 
         console.log(`Checkout session completed: ${session.id}`, { studentId, packageId, credits, location, planName });
