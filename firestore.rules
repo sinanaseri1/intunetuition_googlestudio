@@ -94,11 +94,6 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'teacher';
     }
     
-    function isStudent() {
-      return isAuthenticated() && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'student';
-    }
-
     function hasRequiredFields(fields) {
       return request.resource.data.keys().hasAll(fields);
     }
@@ -136,6 +131,31 @@ service cloud.firestore {
              (data.gdprConsentGiven == null || data.gdprConsentGiven is bool) &&
              (data.gdprConsentDate == null || isValidDateString(data.gdprConsentDate)) &&
              (data.gdprConsentVersion == null || data.gdprConsentVersion is string);
+    }
+
+    // ---------------------------------------------------------------
+    // Credit integrity
+    //
+    // creditsRemaining and packageHistory represent money paid through Stripe.
+    // They are written ONLY by the webhook (api/webhook.ts) via the Firebase
+    // Admin SDK, which bypasses these rules entirely — so no client ever needs
+    // write access to them. Type-checking alone is not enough: a rule that only
+    // asserts `creditsRemaining is number && >= 0` lets any signed-in student
+    // PATCH themselves unlimited free lessons.
+    // ---------------------------------------------------------------
+
+    // True when an update leaves both money fields untouched. Uses diff() so a
+    // write that simply doesn't mention them passes, and a document missing
+    // those fields entirely doesn't raise an error.
+    function creditFieldsUnchanged() {
+      return !request.resource.data.diff(resource.data)
+                .affectedKeys()
+                .hasAny(['creditsRemaining', 'packageHistory']);
+    }
+
+    // A client-created student document must start with nothing paid for.
+    function startsWithNoCredits(data) {
+      return data.creditsRemaining == 0 && data.packageHistory.size() == 0;
     }
 
     function isValidStudentUpdate(data) {
@@ -211,8 +231,20 @@ service cloud.firestore {
 
     match /students/{studentId} {
       allow read: if isOwner(studentId) || isAdmin() || isTeacher();
-      allow create: if (isOwner(studentId) || isAdmin()) && isValidStudent(request.resource.data) && request.resource.data.userId == studentId;
-      allow update: if (isOwner(studentId) || isAdmin()) && isValidStudentUpdate(request.resource.data);
+
+      // The credit guards are ordered so the cheap check runs first: ordinary
+      // profile writes never touch the money fields, so isAdmin() — which costs
+      // an extra document read — is only evaluated when a write actually tries
+      // to change credits.
+      allow create: if (isOwner(studentId) || isAdmin()) &&
+                    isValidStudent(request.resource.data) &&
+                    request.resource.data.userId == studentId &&
+                    (startsWithNoCredits(request.resource.data) || isAdmin());
+
+      allow update: if (isOwner(studentId) || isAdmin()) &&
+                    isValidStudentUpdate(request.resource.data) &&
+                    (creditFieldsUnchanged() || isAdmin());
+
       allow delete: if isAdmin();
     }
 

@@ -99,6 +99,16 @@ function fallbackProfile(firebaseUser: FirebaseUser): UserProfile {
   };
 }
 
+// Held while signUpWithEmail is writing its profile documents.
+//
+// onAuthStateChanged fires the instant the account exists — before those writes
+// land — so the profile sync would otherwise run concurrently, snapshot the
+// documents as missing, and commit with an `exists: false` precondition that is
+// no longer true by the time it lands. That surfaces as a spurious
+// permission-denied on every single sign-up. Awaiting this serialises the two,
+// so the sync sees the finished documents and makes no conflicting writes.
+let signUpInFlight: Promise<void> | null = null;
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -184,6 +194,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
+      // Let an in-progress sign-up finish writing before syncing, so the two
+      // don't race each other over the same documents.
+      if (signUpInFlight) {
+        await signUpInFlight.catch(() => {});
+      }
+
       try {
         setProfile(await syncUserProfile(firebaseUser));
       } catch (error) {
@@ -220,46 +236,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signUpWithEmail = async (email: string, password: string, name: string, studentDetails: StudentSignUpDetails) => {
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    await updateProfile(userCredential.user, { displayName: name });
+    // Claim the flag *before* creating the account: onAuthStateChanged fires as
+    // soon as createUserWithEmailAndPassword resolves, so anything set after
+    // that point is already too late to prevent the race.
+    let releaseSignUp: () => void = () => {};
+    signUpInFlight = new Promise<void>((resolve) => { releaseSignUp = resolve; });
 
-    // onAuthStateChanged creates the users and students documents, and may fire
-    // before updateProfile completes (leaving 'New User' as the name). Write the
-    // correct profile directly with all fields required by firestore.rules
-    // (isValidUser), so the write is permitted whether it lands as a create or
-    // an update; onAuthStateChanged's sync heals any lost race.
-    const now = new Date().toISOString();
-    await setDoc(doc(db, 'users', userCredential.user.uid), {
-      email: userCredential.user.email || '',
-      name,
-      role: 'student',
-      createdAt: now,
-      updatedAt: now,
-    }, { merge: true });
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      await updateProfile(userCredential.user, { displayName: name });
 
-    // Capture the child/parent details and GDPR consent directly at sign-up so
-    // email/password users land straight on /dashboard instead of being routed
-    // through the separate /student-profile and /consent steps (those remain
-    // as a fallback for Google sign-in, which can't collect this data itself).
-    // creditsRemaining/packageHistory are included unconditionally because
-    // isValidStudent() in firestore.rules requires them on every write to this
-    // document, including if this write races ahead of onAuthStateChanged's
-    // own students/{uid} scaffold (Firestore transactions retry on conflict,
-    // so this can't get clobbered by that scaffold write either way).
-    await setDoc(doc(db, 'students', userCredential.user.uid), {
-      userId: userCredential.user.uid,
-      phone: studentDetails.phone.trim(),
-      childName: studentDetails.childName.trim(),
-      yearGroup: studentDetails.yearGroup.trim(),
-      school: studentDetails.school.trim(),
-      gdprConsentGiven: true,
-      gdprConsentDate: now,
-      gdprConsentVersion: '1.0',
-      creditsRemaining: 0,
-      packageHistory: [],
-    }, { merge: true });
+      // Written here rather than left to onAuthStateChanged so the real name is
+      // stored (that listener can only derive a placeholder before updateProfile
+      // completes). All fields required by firestore.rules' isValidUser are
+      // included so the write is permitted as either a create or an update.
+      const now = new Date().toISOString();
+      await setDoc(doc(db, 'users', userCredential.user.uid), {
+        email: userCredential.user.email || '',
+        name,
+        role: 'student',
+        createdAt: now,
+        updatedAt: now,
+      }, { merge: true });
 
-    setProfile((prev) => prev ? { ...prev, name } : prev);
+      // Capture the child/parent details and GDPR consent directly at sign-up so
+      // email/password users land straight on /dashboard instead of being routed
+      // through the separate /student-profile and /consent steps (those remain
+      // as a fallback for Google sign-in, which can't collect this data itself).
+      // creditsRemaining/packageHistory are required by isValidStudent() on
+      // create; writing 0/[] also satisfies startsWithNoCredits(), which stops a
+      // client seeding itself paid credits.
+      await setDoc(doc(db, 'students', userCredential.user.uid), {
+        userId: userCredential.user.uid,
+        phone: studentDetails.phone.trim(),
+        childName: studentDetails.childName.trim(),
+        yearGroup: studentDetails.yearGroup.trim(),
+        school: studentDetails.school.trim(),
+        gdprConsentGiven: true,
+        gdprConsentDate: now,
+        gdprConsentVersion: '1.0',
+        creditsRemaining: 0,
+        packageHistory: [],
+      }, { merge: true });
+
+      setProfile((prev) => prev ? { ...prev, name } : prev);
+    } finally {
+      // Release even on failure, so a failed sign-up can't wedge the listener.
+      releaseSignUp();
+      signUpInFlight = null;
+    }
   };
 
   const logout = async () => {

@@ -3,7 +3,7 @@ import { Outlet, Link } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { Button } from './ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui/sheet';
-import { Menu } from 'lucide-react';
+import { Menu, Instagram } from 'lucide-react';
 import { Logo } from './Logo';
 import { CookieConsent } from './CookieConsent';
 
@@ -148,6 +148,20 @@ export function Layout() {
             <ul className="space-y-2 text-sm">
               <li>Email: Info@intunetuition.co.uk</li>
             </ul>
+
+            <h3 className="text-white font-semibold mt-6 mb-3">Follow Us</h3>
+            <a
+              href="https://www.instagram.com/joelwebbmusic/"
+              target="_blank"
+              // noopener stops the new tab reaching back via window.opener;
+              // noreferrer also withholds the referring URL.
+              rel="noopener noreferrer"
+              aria-label="Follow In Tune Tuition on Instagram (opens in a new tab)"
+              className="inline-flex items-center gap-2 text-stone-400 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b9d9a1] rounded-md"
+            >
+              <Instagram className="h-6 w-6" aria-hidden="true" />
+              <span className="text-sm">@joelwebbmusic</span>
+            </a>
           </div>
         </div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12 pt-8 border-t border-stone-800 text-sm text-center">
