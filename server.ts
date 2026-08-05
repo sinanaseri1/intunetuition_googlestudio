@@ -18,6 +18,7 @@ import {
 import { resolvePackageByPriceId } from './lib/package-catalog';
 import { constructStripeEvent } from './lib/stripe-webhook';
 import { listAllUsers, backfillUserProfile } from './lib/admin-users';
+import { deleteAccountCompletely, countAdmins } from './lib/account-deletion';
 
 async function startServer() {
   const app = express();
@@ -192,6 +193,49 @@ async function startServer() {
       res.json({ user: await backfillUserProfile(uid) });
     } catch (error) {
       const { status, message } = sanitizeError(error, "Failed to create user profile");
+      res.status(status).json({ error: message });
+    }
+  });
+
+  // Mirrors the DELETE branch of api/admin/users.ts.
+  app.delete("/api/admin/users", async (req, res) => {
+    try {
+      const adminUid = await requireAdminId(req);
+      const uid = typeof req.body?.uid === "string" ? req.body.uid.trim() : "";
+      if (!uid) {
+        return res.status(400).json({ error: "uid is required" });
+      }
+      if (uid === adminUid) {
+        return res.status(400).json({
+          error: "You cannot delete your own account from here. Use Account Settings.",
+        });
+      }
+      const target = await getAdminFirestore().collection("users").doc(uid).get();
+      if (target.data()?.role === "admin" && (await countAdmins()) <= 1) {
+        return res.status(400).json({
+          error: "Cannot delete the last remaining admin. Promote another admin first.",
+        });
+      }
+      res.json({ result: await deleteAccountCompletely(uid) });
+    } catch (error) {
+      const { status, message } = sanitizeError(error, "Failed to delete user");
+      res.status(status).json({ error: message });
+    }
+  });
+
+  // Mirrors api/delete-account.ts — permanent self-deletion.
+  app.post("/api/delete-account", async (req, res) => {
+    try {
+      const uid = await requireUserId(req);
+      const own = await getAdminFirestore().collection("users").doc(uid).get();
+      if (own.data()?.role === "admin" && (await countAdmins()) <= 1) {
+        return res.status(400).json({
+          error: "You are the only admin. Promote another admin before deleting your account.",
+        });
+      }
+      res.json({ success: true, result: await deleteAccountCompletely(uid) });
+    } catch (error) {
+      const { status, message } = sanitizeError(error, "Failed to delete account");
       res.status(status).json({ error: message });
     }
   });

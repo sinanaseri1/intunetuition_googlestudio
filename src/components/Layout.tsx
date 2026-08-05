@@ -30,7 +30,7 @@ export function Layout() {
 
   return (
     <div className="min-h-screen flex flex-col bg-stone-50 text-stone-900 font-sans">
-      <header className="bg-white border-b border-stone-200 sticky top-0 z-50">
+      <header className="sticky top-0 z-50 border-b border-stone-200/80 bg-white/85 backdrop-blur-md supports-[backdrop-filter]:bg-white/70">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-24 md:h-32 items-center gap-4">
             <Link to="/" className="flex items-center shrink-0">
@@ -42,7 +42,7 @@ export function Layout() {
                 <Link
                   key={link.to}
                   to={link.to}
-                  className="text-sm font-medium text-stone-600 hover:text-stone-900"
+                  className="relative text-sm font-medium text-stone-600 transition-colors hover:text-stone-900 after:absolute after:-bottom-1.5 after:left-0 after:h-0.5 after:w-0 after:rounded-full after:bg-[var(--brand-strong)] after:transition-all hover:after:w-full"
                 >
                   {link.label}
                 </Link>
@@ -122,8 +122,10 @@ export function Layout() {
         <Outlet />
       </main>
 
-      <footer className="bg-stone-900 text-stone-400 py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-3 gap-8">
+      <footer className="relative bg-stone-900 text-stone-400 py-16">
+        {/* Brand hairline to lift the footer off the page. */}
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[var(--brand)]/50 to-transparent" />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-3 gap-10">
           <div>
             <div className="flex items-center mb-4 bg-white/5 p-2 rounded-lg inline-block">
               <Logo className="h-24 w-auto" />
@@ -133,14 +135,14 @@ export function Layout() {
           <div>
             <h3 className="text-white font-semibold mb-4">Links</h3>
             <ul className="space-y-2 text-sm">
-              <li><Link to="/" className="hover:text-white">Home</Link></li>
-              <li><Link to="/pricing" className="hover:text-white">Pricing</Link></li>
-              <li><Link to="/testimonials" className="hover:text-white">Testimonials</Link></li>
-              <li><Link to="/contact" className="hover:text-white">Contact</Link></li>
-               <li><Link to="/login" className="hover:text-white">Login</Link></li>
-               <li><Link to="/privacy-policy" className="hover:text-white">Privacy Policy</Link></li>
-               <li><Link to="/terms" className="hover:text-white">Terms & Conditions</Link></li>
-               <li><Link to="/delete-account" className="hover:text-white">Delete Account</Link></li>
+              <li><Link to="/" className="transition-colors hover:text-white">Home</Link></li>
+              <li><Link to="/pricing" className="transition-colors hover:text-white">Pricing</Link></li>
+              <li><Link to="/testimonials" className="transition-colors hover:text-white">Testimonials</Link></li>
+              <li><Link to="/contact" className="transition-colors hover:text-white">Contact</Link></li>
+               <li><Link to="/login" className="transition-colors hover:text-white">Login</Link></li>
+               <li><Link to="/privacy-policy" className="transition-colors hover:text-white">Privacy Policy</Link></li>
+               <li><Link to="/terms" className="transition-colors hover:text-white">Terms & Conditions</Link></li>
+               <li><Link to="/delete-account" className="transition-colors hover:text-white">Delete Account</Link></li>
             </ul>
           </div>
           <div>

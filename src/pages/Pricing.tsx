@@ -74,7 +74,10 @@ export function Pricing() {
     <div className="py-24 bg-stone-50 border-t border-stone-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold text-stone-900 mb-4">Term Packages</h2>
+          <span className="inline-block rounded-full bg-[#b9d9a1]/25 px-4 py-1.5 text-sm font-semibold text-[#4f6b3c]">
+            Pricing
+          </span>
+          <h2 className="mt-4 text-3xl md:text-5xl font-bold text-stone-900 mb-4 tracking-tight">Term Packages</h2>
           <p className="text-lg text-stone-600 max-w-2xl mx-auto">
             Select your location and term below to view available packages. All packages include high-quality acoustic guitar tuition.
           </p>
@@ -129,10 +132,10 @@ export function Pricing() {
           {activeLocation.packages.map((pkg) => (
             <Card
               key={pkg.id}
-              className={`flex flex-col relative overflow-visible bg-white ${
+              className={`flex flex-col relative overflow-visible bg-white transition-all duration-200 hover:-translate-y-1 ${
                 pkg.popular
-                  ? 'border-2 border-[#b9d9a1] shadow-xl shadow-[#b9d9a1]/20 md:scale-105 z-10'
-                  : 'border-stone-200'
+                  ? 'border-2 border-[#b9d9a1] shadow-xl shadow-[#b9d9a1]/25 md:scale-105 z-10 hover:shadow-2xl hover:shadow-[#b9d9a1]/30'
+                  : 'border-stone-200 hover:border-stone-300 hover:shadow-xl hover:shadow-stone-900/5'
               }`}
             >
               {pkg.popular && (

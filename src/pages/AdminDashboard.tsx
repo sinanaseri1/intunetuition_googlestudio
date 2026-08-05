@@ -28,6 +28,9 @@ export function AdminDashboard() {
   // quietly showing a partial roster.
   const [userSyncWarning, setUserSyncWarning] = useState<string | null>(null);
   const [backfillingUid, setBackfillingUid] = useState<string | null>(null);
+  const [deletingUser, setDeletingUser] = useState<any | null>(null);
+  const [deleteInProgress, setDeleteInProgress] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Form states
   const [newPackage, setNewPackage] = useState({ name: '', priceGbp: 0, lessons: 0, groupSize: '', description: '', isActive: true });
@@ -68,34 +71,49 @@ export function AdminDashboard() {
     return usersSnapshot.docs.map(d => ({ id: d.id, hasProfile: true, hasAuthAccount: true, ...d.data() }));
   }
 
+  /**
+   * Reads a collection, returning [] instead of throwing.
+   *
+   * Each section of this dashboard is fetched independently so that one missing
+   * or unreadable collection degrades only its own panel. Previously a single
+   * failure anywhere aborted the whole function and left every panel blank —
+   * which is exactly what a deleted `students` or `teachers` collection caused.
+   */
+  async function safeGetDocs(collectionName: string): Promise<any[]> {
+    try {
+      const snapshot = await getDocs(collection(db, collectionName));
+      return snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch (error) {
+      console.warn(`Could not load "${collectionName}" (showing empty):`, error);
+      return [];
+    }
+  }
+
   async function fetchData() {
     try {
-      // Fetch packages
-      const pkgsSnapshot = await getDocs(collection(db, 'packages'));
-      setPackages(pkgsSnapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+      const [allUsersData, packageDocs, studentDocs, slotDocs, bookingDocs] = await Promise.all([
+        fetchAllUsers(),
+        safeGetDocs('packages'),
+        safeGetDocs('students'),
+        safeGetDocs('lessonSlots'),
+        safeGetDocs('bookings'),
+      ]);
 
-      // Fetch users
-      const allUsersData = await fetchAllUsers();
       setAllUsers(allUsersData);
+      setPackages(packageDocs);
+      setSlots(slotDocs);
+      setBookings(bookingDocs);
 
-      const st = allUsersData.filter((u: any) => u.role === 'student');
-      const te = allUsersData.filter((u: any) => u.role === 'teacher');
-
-      // Fetch student details (one query for the whole collection, then match in memory)
-      const studentDocsSnapshot = await getDocs(collection(db, 'students'));
-      const studentDetailsById = new Map(studentDocsSnapshot.docs.map(d => [d.id, d.data()]));
-      const studentsWithDetails = st.map((s: any) => ({ ...s, details: studentDetailsById.get(s.id) }));
-      setStudents(studentsWithDetails);
-      setTeachers(te);
-
-      // Fetch slots
-      const slotsSnapshot = await getDocs(collection(db, 'lessonSlots'));
-      setSlots(slotsSnapshot.docs.map(d => ({ id: d.id, ...d.data() })));
-
-      // Fetch all bookings so admins can see booking status per student
-      const bookingsSnapshot = await getDocs(collection(db, 'bookings'));
-      setBookings(bookingsSnapshot.docs.map(d => ({ id: d.id, ...d.data() })));
-
+      // `details` stays undefined when the students document is missing; every
+      // consumer below reads it optionally, so an absent sub-profile renders as
+      // zero/"N/A" rather than crashing.
+      const studentDetailsById = new Map(studentDocs.map((d: any) => [d.id, d]));
+      setStudents(
+        allUsersData
+          .filter((u: any) => u.role === 'student')
+          .map((s: any) => ({ ...s, details: studentDetailsById.get(s.id) }))
+      );
+      setTeachers(allUsersData.filter((u: any) => u.role === 'teacher'));
     } catch (error) {
       console.error("Error fetching admin data:", error);
     } finally {
@@ -131,6 +149,43 @@ export function AdminDashboard() {
       alert(`Failed to create profile: ${error.message}`);
     } finally {
       setBackfillingUid(null);
+    }
+  };
+
+  /**
+   * Permanently removes an account from Firebase Auth and Firestore.
+   *
+   * Server-side only: firestore.rules forbids clients from deleting these
+   * documents, and Auth accounts can only be removed with the Admin SDK. The
+   * endpoint independently re-checks admin rights and refuses to delete the
+   * caller or the last remaining admin — this dialog is convenience, not the
+   * security boundary.
+   */
+  const handleDeleteUser = async () => {
+    if (!user || !deletingUser) return;
+    setDeleteInProgress(true);
+    setDeleteError(null);
+    try {
+      const token = await user.getIdToken();
+      const response = await fetch('/api/admin/users', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ uid: deletingUser.id }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(body.error || `Request failed (HTTP ${response.status})`);
+      }
+      setDeletingUser(null);
+      await fetchData();
+    } catch (error: any) {
+      console.error('Error deleting user:', error);
+      setDeleteError(error.message);
+    } finally {
+      setDeleteInProgress(false);
     }
   };
 
@@ -486,6 +541,7 @@ export function AdminDashboard() {
                     <TableHead>Sign-in</TableHead>
                     <TableHead>Current Role</TableHead>
                     <TableHead>Change Role</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -545,6 +601,19 @@ export function AdminDashboard() {
                               <option value="admin">Admin</option>
                             </select>
                           )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                            onClick={() => { setDeleteError(null); setDeletingUser(u); }}
+                            disabled={u.id === user?.uid}
+                            title={u.id === user?.uid ? 'You cannot delete your own account from here' : 'Delete account'}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            <span className="sr-only">Delete {u.email}</span>
+                          </Button>
                         </TableCell>
                       </TableRow>
                     );
@@ -678,6 +747,59 @@ export function AdminDashboard() {
           </div>
         </TabsContent>
       </Tabs>
+
+      <Dialog
+        open={!!deletingUser}
+        onOpenChange={(open) => { if (!open && !deleteInProgress) { setDeletingUser(null); setDeleteError(null); } }}
+      >
+        <DialogContent className="sm:max-w-md">
+          {deletingUser && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-red-700">
+                  <AlertTriangle className="h-5 w-5" />
+                  Delete this account?
+                </DialogTitle>
+                <DialogDescription>
+                  This permanently removes <strong>{deletingUser.email}</strong> from both sign-in
+                  and the database, including their profile, bookings and purchase history.
+                  This cannot be undone.
+                </DialogDescription>
+              </DialogHeader>
+
+              {(deletingUser.details?.creditsRemaining ?? 0) > 0 && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                  This account still holds <strong>{deletingUser.details.creditsRemaining}</strong> paid
+                  lesson credit(s). Deleting will destroy that record permanently.
+                </div>
+              )}
+
+              {deleteError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                  {deleteError}
+                </div>
+              )}
+
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => { setDeletingUser(null); setDeleteError(null); }}
+                  disabled={deleteInProgress}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="bg-red-600 text-white hover:bg-red-700"
+                  onClick={handleDeleteUser}
+                  disabled={deleteInProgress}
+                >
+                  {deleteInProgress ? 'Deleting…' : 'Delete permanently'}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!viewingStudent} onOpenChange={(open) => { if (!open) setViewingStudent(null); }}>
         <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">

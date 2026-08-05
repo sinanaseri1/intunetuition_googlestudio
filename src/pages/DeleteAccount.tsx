@@ -7,9 +7,12 @@ import { Checkbox } from '../components/ui/checkbox';
 import { Label } from '../components/ui/label';
 import { AlertTriangle, CheckCircle2, AlertCircle } from 'lucide-react';
 
+type Mode = 'anonymize' | 'delete';
+
 export function DeleteAccount() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [mode, setMode] = useState<Mode>('anonymize');
   const [confirmed, setConfirmed] = useState(false);
   const [reason, setReason] = useState('');
   const [loading, setLoading] = useState(false);
@@ -21,19 +24,24 @@ export function DeleteAccount() {
     setError('');
 
     if (!confirmed) {
-      setError('You must confirm you understand the implications of account anonymization');
+      setError(
+        mode === 'delete'
+          ? 'You must confirm you understand your account will be permanently deleted'
+          : 'You must confirm you understand the implications of account anonymization'
+      );
       return;
     }
 
     if (!user) {
-      setError('You must be logged in to request account anonymization');
+      setError('You must be logged in to make this request');
       return;
     }
 
     setLoading(true);
     try {
       const token = await user.getIdToken();
-      const response = await fetch('/api/anonymize-account', {
+      const endpoint = mode === 'delete' ? '/api/delete-account' : '/api/anonymize-account';
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -42,18 +50,18 @@ export function DeleteAccount() {
         body: JSON.stringify({ reason }),
       });
 
-      const data = await response.json();
-      
-      if (data.success) {
+      const data = await response.json().catch(() => ({}));
+
+      if (response.ok && data.success) {
         setSuccess(true);
         setTimeout(() => {
           window.location.replace('/');
         }, 3000);
       } else {
-        throw new Error(data.error || 'Failed to submit request');
+        throw new Error(data.error || `Request failed (HTTP ${response.status})`);
       }
     } catch (err: any) {
-      console.error("Error submitting anonymization request:", err);
+      console.error('Error processing account request:', err);
       setError(err.message || 'Failed to submit request. Please try again.');
     } finally {
       setLoading(false);
@@ -66,13 +74,23 @@ export function DeleteAccount() {
         <Card className="w-full max-w-2xl shadow-lg">
           <CardContent className="pt-8 text-center">
             <CheckCircle2 className="h-16 w-16 text-green-600 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-stone-900 mb-2">Request Submitted</h2>
+            <h2 className="text-2xl font-bold text-stone-900 mb-2">
+              {mode === 'delete' ? 'Account Deleted' : 'Account Anonymized'}
+            </h2>
             <p className="text-stone-600 mb-4">
-              Your account anonymization request has been received. You'll receive an email 
-              at <strong>info@intunetuition.co.uk</strong> with confirmation details.
+              {mode === 'delete'
+                ? 'Your account and personal data have been permanently removed.'
+                : 'Your personal data has been anonymized and can no longer be used to identify you.'}
             </p>
             <p className="text-sm text-stone-500">
-              You will be logged out and redirected to the home page...
+              You will be logged out and redirected to the home page…
+            </p>
+            <p className="mt-4 text-sm text-stone-500">
+              If you need written confirmation for your records, email{' '}
+              <a href="mailto:info@intunetuition.co.uk" className="text-[#7fa663] hover:underline">
+                info@intunetuition.co.uk
+              </a>
+              .
             </p>
           </CardContent>
         </Card>
@@ -86,15 +104,62 @@ export function DeleteAccount() {
         <CardHeader className="text-center">
           <CardTitle className="text-2xl text-red-700 flex items-center justify-center gap-2">
             <AlertTriangle className="h-6 w-6" />
-            Request Account Anonymization
+            Close Your Account
           </CardTitle>
           <CardDescription>
-            This action will anonymize your personal data while keeping your booking records
+            Choose how you'd like your data handled. Both options are permanent.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+            <fieldset className="space-y-3">
+              <legend className="text-sm font-semibold text-stone-900 mb-2">What would you like to do?</legend>
+
+              {([
+                {
+                  value: 'anonymize' as Mode,
+                  title: 'Anonymize my data (recommended)',
+                  body: 'Removes everything that identifies you, but keeps anonymous booking and payment records we are required to retain.',
+                },
+                {
+                  value: 'delete' as Mode,
+                  title: 'Permanently delete my account',
+                  body: 'Erases your sign-in and all of your records entirely, including bookings and purchase history. Nothing is retained.',
+                },
+              ]).map((option) => (
+                <label
+                  key={option.value}
+                  className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition-colors ${
+                    mode === option.value
+                      ? 'border-[#7fa663] bg-[#b9d9a1]/10'
+                      : 'border-stone-200 hover:border-stone-300'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="closure-mode"
+                    value={option.value}
+                    checked={mode === option.value}
+                    onChange={() => { setMode(option.value); setConfirmed(false); setError(''); }}
+                    className="mt-1 h-4 w-4 accent-[#7fa663]"
+                  />
+                  <span>
+                    <span className="block text-sm font-medium text-stone-900">{option.title}</span>
+                    <span className="mt-1 block text-sm text-stone-600">{option.body}</span>
+                  </span>
+                </label>
+              ))}
+            </fieldset>
+
+            {mode === 'delete' && (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+                <strong>This cannot be undone.</strong> Your sign-in, profile, bookings and any
+                remaining lesson credits will be erased. If you have unused credits, contact us
+                before continuing — they cannot be recovered afterwards.
+              </div>
+            )}
+
+            <div className={mode === 'anonymize' ? 'bg-amber-50 border border-amber-200 rounded-lg p-4' : 'hidden'}>
               <h3 className="font-semibold text-amber-800 mb-3">What happens when your account is anonymized:</h3>
               <ul className="space-y-2 text-sm text-amber-900">
                 <li className="flex items-start gap-2">
@@ -120,7 +185,7 @@ export function DeleteAccount() {
               </ul>
             </div>
 
-            <div className="bg-stone-50 border border-stone-200 rounded-lg p-4">
+            <div className={mode === 'anonymize' ? 'bg-stone-50 border border-stone-200 rounded-lg p-4' : 'hidden'}>
               <h3 className="font-semibold text-stone-800 mb-3">What will be kept (for our records):</h3>
               <ul className="space-y-2 text-sm text-stone-600">
                 <li className="flex items-start gap-2">
@@ -161,8 +226,9 @@ export function DeleteAccount() {
                 className="mt-1"
               />
               <Label htmlFor="confirm" className="text-sm leading-relaxed">
-                I understand that my personal data will be permanently anonymized and I will 
-                lose access to my account. This action cannot be undone.
+                {mode === 'delete'
+                  ? 'I understand my account and all of my records will be permanently deleted, and that this cannot be undone.'
+                  : 'I understand that my personal data will be permanently anonymized and I will lose access to my account. This action cannot be undone.'}
               </Label>
             </div>
 
@@ -180,7 +246,11 @@ export function DeleteAccount() {
                 className="flex-1 h-12"
                 disabled={loading}
               >
-                {loading ? 'Submitting...' : 'Request Account Anonymization'}
+                {loading
+                  ? 'Processing…'
+                  : mode === 'delete'
+                    ? 'Permanently Delete My Account'
+                    : 'Anonymize My Account'}
               </Button>
               <Link to="/dashboard" className="flex-1">
                 <Button 
