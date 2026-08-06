@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../lib/auth';
 import { db } from '../firebase';
 import { doc, getDoc } from 'firebase/firestore';
@@ -6,7 +6,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '../components/ui/button';
 import { Calendar, CheckCircle2, Music, Package } from 'lucide-react';
 import { format } from 'date-fns';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { LOCATIONS, formatPrice } from '../config/terms';
 
 function findTermInfo(packageId: string) {
@@ -23,13 +24,51 @@ function findTermInfo(packageId: string) {
 export function Dashboard() {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const [studentData, setStudentData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [paymentReceived, setPaymentReceived] = useState(false);
 
-  const sessionId = searchParams.get('session_id');
-  const subscriptionSuccess = searchParams.get('subscription_success') === 'true';
+  // Read Stripe's return parameters ONCE, from the URL as it was on mount.
+  // They're stripped from the address bar immediately afterwards, so this
+  // snapshot — not the live URL — drives the banners and the fulfilment poll.
+  const [checkoutReturn] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return {
+      sessionId: params.get('session_id'),
+      subscriptionSuccess: params.get('subscription_success') === 'true',
+      canceled: params.get('canceled') === 'true',
+    };
+  });
+  const { sessionId, subscriptionSuccess } = checkoutReturn;
+
+  // Strip the Stripe params so a refresh, bookmark or back-navigation doesn't
+  // replay the success notice (or re-run the poll) for a purchase that already
+  // completed. replaceState avoids adding a history entry.
+  useEffect(() => {
+    if (!sessionId && !subscriptionSuccess && !checkoutReturn.canceled) return;
+    const url = new URL(window.location.href);
+    for (const param of ['session_id', 'success', 'subscription_success', 'canceled']) {
+      url.searchParams.delete(param);
+    }
+    window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+  }, [sessionId, subscriptionSuccess, checkoutReturn.canceled]);
+
+  // Guards against duplicate toasts. StrictMode double-invokes effects in dev,
+  // and the poll below can be re-entered; a toast should fire exactly once per
+  // checkout return either way.
+  const notifiedRef = useRef<{ canceled: boolean; success: boolean; timeout: boolean }>({
+    canceled: false,
+    success: false,
+    timeout: false,
+  });
+
+  // Abandoned checkout previously gave no feedback at all.
+  useEffect(() => {
+    if (checkoutReturn.canceled && !notifiedRef.current.canceled) {
+      notifiedRef.current.canceled = true;
+      toast.info('Checkout cancelled — you have not been charged.');
+    }
+  }, [checkoutReturn.canceled]);
 
   useEffect(() => {
     if (!user || !sessionId) return;
@@ -44,16 +83,36 @@ export function Dashboard() {
           const history: any[] = data.packageHistory || [];
           const found = history.some((h: any) => h.sessionId === sessionId);
           if (found) {
+            // Refreshes the whole student record, so the credit balance and
+            // purchase history on this page reflect the new purchase.
             setStudentData(data);
             setPaymentReceived(true);
+            if (!notifiedRef.current.success) {
+              notifiedRef.current.success = true;
+              const entry = history.find((h: any) => h.sessionId === sessionId);
+              toast.success('Payment successful', {
+                description: entry?.credits
+                  ? `${entry.credits} lesson credits have been added to your account.`
+                  : 'Your lesson credits have been added to your account.',
+              });
+            }
             return;
           }
         }
       } catch (error) {
         console.error("Error polling payment status:", error);
       }
-      if (!cancelled && attempts < 8) {
-        setTimeout(poll, 2000);
+      if (!cancelled) {
+        if (attempts < 8) {
+          setTimeout(poll, 2000);
+        } else if (!notifiedRef.current.timeout) {
+          // Fulfilment is webhook-driven, so a slow delivery is possible. Say so
+          // rather than leaving the "Confirming…" banner spinning forever.
+          notifiedRef.current.timeout = true;
+          toast.warning('Still confirming your payment', {
+            description: 'This is taking longer than usual. Your credits will appear shortly — refresh in a minute.',
+          });
+        }
       }
     };
     poll();
