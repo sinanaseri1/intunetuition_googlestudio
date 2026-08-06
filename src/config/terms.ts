@@ -53,9 +53,9 @@ export const LOCATIONS: Location[] = [
           premium: 66.0,
         },
         stripePriceIds: {
-          standard: 'price_1U0l53DEUlJgtpZgtgg7U6f7',
-          sibling: 'price_1U0l55DEUlJgtpZgmaWC5YRS',
-          premium: 'price_1U0l55DEUlJgtpZg2Ru568wi',
+          standard: 'price_1U1SlUCBRNABHb9bnlJD4O1e',
+          sibling: 'price_1U1SlVCBRNABHb9bmDWWgCoR',
+          premium: 'price_1U1SlVCBRNABHb9b0RXhe2QE',
         },
       },
       {
@@ -70,9 +70,9 @@ export const LOCATIONS: Location[] = [
           premium: 77.0,
         },
         stripePriceIds: {
-          standard: 'price_1U0l56DEUlJgtpZgYkigMzWW',
-          sibling: 'price_1U0l57DEUlJgtpZg0p0knvca',
-          premium: 'price_1U0l58DEUlJgtpZg2Dti771v',
+          standard: 'price_1U1SlWCBRNABHb9b6IeyfZaQ',
+          sibling: 'price_1U1SlXCBRNABHb9bZ8dZZUxR',
+          premium: 'price_1U1SlXCBRNABHb9buIkGwghl',
         },
       },
       {
@@ -87,9 +87,9 @@ export const LOCATIONS: Location[] = [
           premium: 66.0,
         },
         stripePriceIds: {
-          standard: 'price_1U0l5ADEUlJgtpZgD77oqaaj',
-          sibling: 'price_1U0l5BDEUlJgtpZg8NesXolU',
-          premium: 'price_1U0l5CDEUlJgtpZgMuuNaX1g',
+          standard: 'price_1U1SlYCBRNABHb9bHZYf9Rqa',
+          sibling: 'price_1U1SlYCBRNABHb9biCKiABxo',
+          premium: 'price_1U1SlZCBRNABHb9bgVZsVRV9',
         },
       },
       {
@@ -104,9 +104,9 @@ export const LOCATIONS: Location[] = [
           premium: 55.0,
         },
         stripePriceIds: {
-          standard: 'price_1U0l5DDEUlJgtpZglvtWOBLn',
-          sibling: 'price_1U0l5EDEUlJgtpZgUSf783cC',
-          premium: 'price_1U0l5FDEUlJgtpZgr9znRfU1',
+          standard: 'price_1U1SlaCBRNABHb9b7IE8rppL',
+          sibling: 'price_1U1SlaCBRNABHb9bFwyRzwAz',
+          premium: 'price_1U1SlbCBRNABHb9bWNXVtRRb',
         },
       },
     ],
@@ -132,9 +132,9 @@ export const LOCATIONS: Location[] = [
           premium: 77.0,
         },
         stripePriceIds: {
-          standard: 'price_1U0l5GDEUlJgtpZgus0RgHBL',
-          sibling: 'price_1U0l5HDEUlJgtpZgjT5ESNuo',
-          premium: 'price_1U0l5IDEUlJgtpZgFHyqD8xN',
+          standard: 'price_1U1SlbCBRNABHb9bU8Z19uPu',
+          sibling: 'price_1U1SlcCBRNABHb9bJivHjKfC',
+          premium: 'price_1U1SldCBRNABHb9bSIXFS1XI',
         },
       },
       {
@@ -149,9 +149,9 @@ export const LOCATIONS: Location[] = [
           premium: 77.0,
         },
         stripePriceIds: {
-          standard: 'price_1U0l5JDEUlJgtpZgcBN7R6xN',
-          sibling: 'price_1U0l5KDEUlJgtpZgKumcruWE',
-          premium: 'price_1U0l5LDEUlJgtpZgJwKFTG7w',
+          standard: 'price_1U1SldCBRNABHb9bi8tYNgk6',
+          sibling: 'price_1U1SleCBRNABHb9bZUgneNoC',
+          premium: 'price_1U1SlfCBRNABHb9bvA4a3i0k',
         },
       },
       {
@@ -166,9 +166,9 @@ export const LOCATIONS: Location[] = [
           premium: 66.0,
         },
         stripePriceIds: {
-          standard: 'price_1U0l5MDEUlJgtpZgMgmYfcB3',
-          sibling: 'price_1U0l5NDEUlJgtpZgFUjf95Gw',
-          premium: 'price_1U0l5ODEUlJgtpZg1qBAY2ZR',
+          standard: 'price_1U1SlfCBRNABHb9bNGxYtjPa',
+          sibling: 'price_1U1SlgCBRNABHb9bguZsqEiJ',
+          premium: 'price_1U1SlgCBRNABHb9bdwBAdpws',
         },
       },
       {
@@ -183,9 +183,9 @@ export const LOCATIONS: Location[] = [
           premium: 55.0,
         },
         stripePriceIds: {
-          standard: 'price_1U0l5PDEUlJgtpZgWh2Zk5Yv',
-          sibling: 'price_1U0l5QDEUlJgtpZgV5RkNBp8',
-          premium: 'price_1U0l5RDEUlJgtpZg4e8RfSc8',
+          standard: 'price_1U1SlhCBRNABHb9buS8GL5vg',
+          sibling: 'price_1U1SliCBRNABHb9bFtDryyTG',
+          premium: 'price_1U1SliCBRNABHb9bL3yohfUD',
         },
       },
     ],
@@ -211,9 +211,9 @@ export const LOCATIONS: Location[] = [
           premium: 77.0,
         },
         stripePriceIds: {
-          standard: 'price_1U0l5SDEUlJgtpZgkMsqac7i',
-          sibling: 'price_1U0l5TDEUlJgtpZgCNo4GmX2',
-          premium: 'price_1U0l5UDEUlJgtpZgrXw8GYHI',
+          standard: 'price_1U1SljCBRNABHb9b2ZOTyLqv',
+          sibling: 'price_1U1SljCBRNABHb9bYo43vlp4',
+          premium: 'price_1U1SlkCBRNABHb9bXwEfDQJJ',
         },
       },
       {
@@ -228,9 +228,9 @@ export const LOCATIONS: Location[] = [
           premium: 88.0,
         },
         stripePriceIds: {
-          standard: 'price_1U0l5VDEUlJgtpZgDKwf3ccj',
-          sibling: 'price_1U0l5WDEUlJgtpZgCTdKCXxa',
-          premium: 'price_1U0l5XDEUlJgtpZgvl7ruuVH',
+          standard: 'price_1U1SllCBRNABHb9bBYzQZx3I',
+          sibling: 'price_1U1SllCBRNABHb9bj17t5Rdp',
+          premium: 'price_1U1SlmCBRNABHb9bD0ScZXkN',
         },
       },
       {
@@ -245,9 +245,9 @@ export const LOCATIONS: Location[] = [
           premium: 66.0,
         },
         stripePriceIds: {
-          standard: 'price_1U0l5YDEUlJgtpZgonaXHHss',
-          sibling: 'price_1U0l5ZDEUlJgtpZgrD0YrVzl',
-          premium: 'price_1U0l5aDEUlJgtpZgbwCVCOwZ',
+          standard: 'price_1U1SlnCBRNABHb9biPMqf4Hn',
+          sibling: 'price_1U1SlnCBRNABHb9bVmC06TVw',
+          premium: 'price_1U1SloCBRNABHb9bb0BkfqKV',
         },
       },
       {
@@ -262,9 +262,9 @@ export const LOCATIONS: Location[] = [
           premium: 44.0,
         },
         stripePriceIds: {
-          standard: 'price_1U0l5bDEUlJgtpZg5YSwsSJA',
-          sibling: 'price_1U0l5cDEUlJgtpZgREwDPdmO',
-          premium: 'price_1U0l5dDEUlJgtpZgiWtwtnXP',
+          standard: 'price_1U1SloCBRNABHb9bLDgM43Yv',
+          sibling: 'price_1U1SlpCBRNABHb9bbw3rOtEn',
+          premium: 'price_1U1SlqCBRNABHb9blaHa0X1R',
         },
       },
     ],
