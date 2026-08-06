@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenAI } from '@google/genai';
-import { handleCors, sanitizeError, safeJsonResponse, requireEnv, verifyAuthToken } from '../lib/api-utils';
+import { handleCors, sanitizeError, safeJsonResponse, requireEnv, verifyAuthToken } from '../lib/api-utils.js';
 
 const geminiSchema = {
   type: 'object' as const,

@@ -13,6 +13,7 @@ export function Pricing() {
   const [activeLocationId, setActiveLocationId] = useState(LOCATIONS[0].id);
   const [activeTermId, setActiveTermId] = useState(LOCATIONS[0].terms[0].id);
   const [loading, setLoading] = useState<string | null>(null);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
   const activeLocation: Location = LOCATIONS.find(l => l.id === activeLocationId)!;
   const activeTerm = activeLocation.terms.find(t => t.id === activeTermId)
@@ -37,6 +38,7 @@ export function Pricing() {
 
     const pkg = activeLocation.packages.find(p => p.id === packageId)!;
     setLoading(packageId);
+    setCheckoutError(null);
     try {
       const token = await user.getIdToken();
       const response = await fetch('/api/create-checkout-session', {
@@ -55,16 +57,41 @@ export function Pricing() {
         }),
       });
 
-      const data = await response.json();
+      // Read as text first. A crashed serverless function returns Vercel's
+      // plain-text error page, not JSON — calling response.json() on that throws
+      // "Unexpected token 'A'", which buries the real server error behind a
+      // parse failure and makes the fault look like it's in the client.
+      const raw = await response.text();
 
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        throw new Error(data.error || 'Failed to create checkout session');
+      let data: { url?: string; error?: string } | null = null;
+      try {
+        data = raw ? JSON.parse(raw) : null;
+      } catch {
+        console.error(
+          `Checkout failed: server returned non-JSON (HTTP ${response.status}, ` +
+          `content-type: ${response.headers.get('content-type') || 'unknown'}).`,
+          '\nRaw response:', raw.slice(0, 500)
+        );
+        throw new Error(
+          response.status >= 500
+            ? 'The payment service is temporarily unavailable. Please try again shortly.'
+            : `Unexpected response from the payment service (HTTP ${response.status}).`
+        );
       }
+
+      if (!response.ok) {
+        console.error(`Checkout failed (HTTP ${response.status}):`, data);
+        throw new Error(data?.error || `Checkout failed (HTTP ${response.status}).`);
+      }
+
+      if (!data?.url) {
+        throw new Error(data?.error || 'The payment service did not return a checkout link.');
+      }
+
+      window.location.href = data.url;
     } catch (error) {
       console.error('Checkout error:', error);
-      alert('Failed to start checkout process. Please try again.');
+      setCheckoutError(error instanceof Error ? error.message : 'Failed to start checkout. Please try again.');
     } finally {
       setLoading(null);
     }
@@ -118,6 +145,15 @@ export function Pricing() {
             ))}
           </div>
         </div>
+
+        {checkoutError && (
+          <div
+            role="alert"
+            className="mx-auto mb-8 max-w-2xl rounded-xl border border-red-200 bg-red-50 p-4 text-center text-sm text-red-800"
+          >
+            {checkoutError}
+          </div>
+        )}
 
         <div className="text-center mb-8">
           <p className="text-stone-500">

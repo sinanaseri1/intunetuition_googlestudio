@@ -1,4 +1,4 @@
-import { LOCATIONS } from './terms';
+import { LOCATIONS } from './terms.js';
 
 export interface ResolvedPackage {
   packageId: string;

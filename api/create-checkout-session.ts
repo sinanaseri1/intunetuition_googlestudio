@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Stripe from 'stripe';
-import { handleCors, checkoutSchema, sanitizeError, safeJsonResponse, verifyAuthToken, resolveAppUrl } from '../lib/api-utils';
-import { resolvePackageByPriceId } from '../lib/package-catalog';
+import { handleCors, checkoutSchema, sanitizeError, safeJsonResponse, verifyAuthToken, resolveAppUrl } from '../lib/api-utils.js';
+import { resolvePackageByPriceId } from '../lib/package-catalog.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   handleCors(req, res);

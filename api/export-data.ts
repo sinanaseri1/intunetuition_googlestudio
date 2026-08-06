@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getAdminFirestore } from '../lib/firebase-admin';
-import { handleCors, verifyAuthToken, sanitizeError, safeJsonResponse } from '../lib/api-utils';
+import { getAdminFirestore } from '../lib/firebase-admin.js';
+import { handleCors, verifyAuthToken, sanitizeError, safeJsonResponse } from '../lib/api-utils.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   handleCors(req, res);
