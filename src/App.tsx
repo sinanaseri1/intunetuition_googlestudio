@@ -90,8 +90,15 @@ export default function App() {
             <Route path="checkout/success" element={<CheckoutSuccess />} />
             <Route path="checkout/cancel" element={<CheckoutCancel />} />
             
+            {/* Not restricted to 'student': anyone with an account can buy a
+                package, and the post-checkout "View Purchase History" button
+                lands here. Gating this to students bounced admins and teachers
+                to "/" straight after a successful payment. The page only ever
+                reads the signed-in user's own record, so there is nothing to
+                protect by role — the onboarding redirects inside Dashboard are
+                already scoped to students. */}
             <Route path="dashboard" element={
-              <ProtectedRoute allowedRoles={['student']}>
+              <ProtectedRoute>
                 <Dashboard />
               </ProtectedRoute>
             } />
