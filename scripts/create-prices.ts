@@ -3,10 +3,12 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import Stripe from 'stripe';
-import { LOCATIONS } from '../src/config/terms';
+import { LOCATIONS } from '../lib/terms';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const TERMS_FILE = path.resolve(__dirname, '../src/config/terms.ts');
+// The price IDs this script rewrites in place now live in lib/terms.ts —
+// src/config/terms.ts is just a re-export (see that file for why).
+const TERMS_FILE = path.resolve(__dirname, '../lib/terms.ts');
 
 function pence(amount: number): number {
   return Math.round(amount * 100);
