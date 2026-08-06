@@ -3,8 +3,6 @@ import { auth, db } from '../firebase';
 import {
   onAuthStateChanged,
   User as FirebaseUser,
-  signInWithPopup,
-  GoogleAuthProvider,
   signOut,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -68,7 +66,6 @@ interface AuthContextType {
    */
   profileError: string | null;
   reloadProfile: () => Promise<void>;
-  signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string, name: string, studentDetails: StudentSignUpDetails) => Promise<void>;
   logout: () => Promise<void>;
@@ -279,11 +276,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => unsubscribe();
   }, [applyProfile]);
 
-  const signInWithGoogle = async () => {
-    const provider = new GoogleAuthProvider();
-    await signInWithPopup(auth, provider);
-  };
-
   const signInWithEmail = async (email: string, password: string) => {
     await signInWithEmailAndPassword(auth, email, password);
   };
@@ -345,7 +337,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, profileError, reloadProfile, signInWithGoogle, signInWithEmail, signUpWithEmail, logout }}>
+    <AuthContext.Provider value={{ user, profile, loading, profileError, reloadProfile, signInWithEmail, signUpWithEmail, logout }}>
       {children}
     </AuthContext.Provider>
   );

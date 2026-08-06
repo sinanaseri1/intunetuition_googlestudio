@@ -7,6 +7,7 @@ import { Menu, Instagram } from 'lucide-react';
 import { Logo } from './Logo';
 import { CookieConsent } from './CookieConsent';
 import { Toaster } from './ui/sonner';
+import { SetPasswordPrompt } from './SetPasswordPrompt';
 
 export function Layout() {
   const { user, profile, logout } = useAuth();
@@ -118,6 +119,8 @@ export function Layout() {
           </div>
         </div>
       </header>
+
+      <SetPasswordPrompt />
 
       <main className="flex-1">
         <Outlet />
