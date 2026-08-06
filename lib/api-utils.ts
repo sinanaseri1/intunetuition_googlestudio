@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import type { IncomingHttpHeaders } from 'node:http';
 import { z } from 'zod';
-import { verifyIdToken, getAdminFirestore } from './firebase-admin';
+import { verifyIdToken, getAdminFirestore } from './firebase-admin.js';
 import type { DecodedIdToken } from 'firebase-admin/auth';
 
 function stripTrailingSlash(value: string): string {

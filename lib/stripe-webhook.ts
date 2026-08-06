@@ -1,5 +1,5 @@
 import type Stripe from 'stripe';
-import { getWebhookSecrets } from './api-utils';
+import { getWebhookSecrets } from './api-utils.js';
 
 /**
  * Verifies a Stripe webhook signature against every configured secret.

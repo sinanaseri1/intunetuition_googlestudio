@@ -1,9 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Stripe from 'stripe';
 import admin from 'firebase-admin';
-import { getAdminFirestore } from '../lib/firebase-admin';
-import { handleCors, safeJsonResponse, getWebhookSecrets } from '../lib/api-utils';
-import { constructStripeEvent } from '../lib/stripe-webhook';
+import { getAdminFirestore } from '../lib/firebase-admin.js';
+import { handleCors, safeJsonResponse, getWebhookSecrets } from '../lib/api-utils.js';
+import { constructStripeEvent } from '../lib/stripe-webhook.js';
 
 let stripe: Stripe | null = null;
 

@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { deleteAccountCompletely, countAdmins } from '../lib/account-deletion';
-import { getAdminFirestore } from '../lib/firebase-admin';
-import { handleCors, verifyAuthToken, sanitizeError, safeJsonResponse } from '../lib/api-utils';
+import { deleteAccountCompletely, countAdmins } from '../lib/account-deletion.js';
+import { getAdminFirestore } from '../lib/firebase-admin.js';
+import { handleCors, verifyAuthToken, sanitizeError, safeJsonResponse } from '../lib/api-utils.js';
 
 /**
  * Permanent self-deletion. Distinct from /api/anonymize-account, which keeps the

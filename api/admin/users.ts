@@ -1,9 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { z } from 'zod';
-import { listAllUsers, backfillUserProfile } from '../../lib/admin-users';
-import { deleteAccountCompletely, countAdmins } from '../../lib/account-deletion';
-import { getAdminFirestore } from '../../lib/firebase-admin';
-import { handleCors, verifyAdminToken, sanitizeError, safeJsonResponse } from '../../lib/api-utils';
+import { listAllUsers, backfillUserProfile } from '../../lib/admin-users.js';
+import { deleteAccountCompletely, countAdmins } from '../../lib/account-deletion.js';
+import { getAdminFirestore } from '../../lib/firebase-admin.js';
+import { handleCors, verifyAdminToken, sanitizeError, safeJsonResponse } from '../../lib/api-utils.js';
 
 const uidSchema = z.object({
   uid: z.string().min(1, 'uid is required').max(128),

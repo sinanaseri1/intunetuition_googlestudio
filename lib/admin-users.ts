@@ -1,4 +1,4 @@
-import { getAdminAuth, getAdminFirestore } from './firebase-admin';
+import { getAdminAuth, getAdminFirestore } from './firebase-admin.js';
 
 export interface AdminUserRecord {
   id: string;
