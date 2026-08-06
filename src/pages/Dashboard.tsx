@@ -1,13 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../lib/auth';
 import { db } from '../firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Calendar, CheckCircle2, Music, Package } from 'lucide-react';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
 import { LOCATIONS, formatPrice } from '../config/terms';
 
 function findTermInfo(packageId: string) {
@@ -26,98 +25,22 @@ export function Dashboard() {
   const navigate = useNavigate();
   const [studentData, setStudentData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [paymentReceived, setPaymentReceived] = useState(false);
 
-  // Read Stripe's return parameters ONCE, from the URL as it was on mount.
-  // They're stripped from the address bar immediately afterwards, so this
-  // snapshot — not the live URL — drives the banners and the fulfilment poll.
-  const [checkoutReturn] = useState(() => {
-    const params = new URLSearchParams(window.location.search);
-    return {
-      sessionId: params.get('session_id'),
-      subscriptionSuccess: params.get('subscription_success') === 'true',
-      canceled: params.get('canceled') === 'true',
-    };
-  });
-  const { sessionId, subscriptionSuccess } = checkoutReturn;
-
-  // Strip the Stripe params so a refresh, bookmark or back-navigation doesn't
-  // replay the success notice (or re-run the poll) for a purchase that already
-  // completed. replaceState avoids adding a history entry.
+  // Live subscription to the student record, so a purchase confirmed by the
+  // Stripe webhook appears in the history below the moment it lands — including
+  // while this page is already open. Post-checkout confirmation itself now lives
+  // on /checkout/success; this page just needs to stay current.
   useEffect(() => {
-    if (!sessionId && !subscriptionSuccess && !checkoutReturn.canceled) return;
-    const url = new URL(window.location.href);
-    for (const param of ['session_id', 'success', 'subscription_success', 'canceled']) {
-      url.searchParams.delete(param);
-    }
-    window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
-  }, [sessionId, subscriptionSuccess, checkoutReturn.canceled]);
-
-  // Guards against duplicate toasts. StrictMode double-invokes effects in dev,
-  // and the poll below can be re-entered; a toast should fire exactly once per
-  // checkout return either way.
-  const notifiedRef = useRef<{ canceled: boolean; success: boolean; timeout: boolean }>({
-    canceled: false,
-    success: false,
-    timeout: false,
-  });
-
-  // Abandoned checkout previously gave no feedback at all.
-  useEffect(() => {
-    if (checkoutReturn.canceled && !notifiedRef.current.canceled) {
-      notifiedRef.current.canceled = true;
-      toast.info('Checkout cancelled — you have not been charged.');
-    }
-  }, [checkoutReturn.canceled]);
-
-  useEffect(() => {
-    if (!user || !sessionId) return;
-    let cancelled = false;
-    let attempts = 0;
-    const poll = async () => {
-      attempts++;
-      try {
-        const docSnap = await getDoc(doc(db, 'students', user.uid));
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          const history: any[] = data.packageHistory || [];
-          const found = history.some((h: any) => h.sessionId === sessionId);
-          if (found) {
-            // Refreshes the whole student record, so the credit balance and
-            // purchase history on this page reflect the new purchase.
-            setStudentData(data);
-            setPaymentReceived(true);
-            if (!notifiedRef.current.success) {
-              notifiedRef.current.success = true;
-              const entry = history.find((h: any) => h.sessionId === sessionId);
-              toast.success('Payment successful', {
-                description: entry?.credits
-                  ? `${entry.credits} lesson credits have been added to your account.`
-                  : 'Your lesson credits have been added to your account.',
-              });
-            }
-            return;
-          }
-        }
-      } catch (error) {
-        console.error("Error polling payment status:", error);
-      }
-      if (!cancelled) {
-        if (attempts < 8) {
-          setTimeout(poll, 2000);
-        } else if (!notifiedRef.current.timeout) {
-          // Fulfilment is webhook-driven, so a slow delivery is possible. Say so
-          // rather than leaving the "Confirming…" banner spinning forever.
-          notifiedRef.current.timeout = true;
-          toast.warning('Still confirming your payment', {
-            description: 'This is taking longer than usual. Your credits will appear shortly — refresh in a minute.',
-          });
-        }
-      }
-    };
-    poll();
-    return () => { cancelled = true; };
-  }, [user, sessionId]);
+    if (!user) return;
+    const unsubscribe = onSnapshot(
+      doc(db, 'students', user.uid),
+      (snapshot) => {
+        if (snapshot.exists()) setStudentData(snapshot.data());
+      },
+      (error) => console.error('Error watching student record:', error)
+    );
+    return unsubscribe;
+  }, [user]);
 
   useEffect(() => {
     let mounted = true;
@@ -181,33 +104,9 @@ export function Dashboard() {
   const sortedHistory = [...history].sort(
     (a, b) => new Date(b.purchasedAt).getTime() - new Date(a.purchasedAt).getTime()
   );
-  const latest = sortedHistory[0];
-  const latestTermInfo = latest ? findTermInfo(latest.packageId) : null;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      {subscriptionSuccess || (sessionId && paymentReceived) ? (
-        <div className="mb-8 bg-green-50 border border-green-200 rounded-lg p-4 flex items-start">
-          <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5 mr-3 shrink-0" />
-          <div>
-            <h3 className="text-green-800 font-medium">Payment Successful!</h3>
-            <p className="text-green-700 text-sm mt-1">
-              Your purchase has been confirmed and your lesson credits have been added.
-            </p>
-          </div>
-        </div>
-      ) : (sessionId && !paymentReceived && (
-        <div className="mb-8 bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start">
-          <CheckCircle2 className="h-5 w-5 text-blue-600 mt-0.5 mr-3 shrink-0" />
-          <div>
-            <h3 className="text-blue-800 font-medium">Confirming your payment…</h3>
-            <p className="text-blue-700 text-sm mt-1">
-              We're processing your payment. Your credits will appear here shortly.
-            </p>
-          </div>
-        </div>
-      ))}
-
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
         <div>
           <h1 className="text-3xl font-bold text-stone-900">Welcome back, {profile?.name}</h1>
@@ -256,28 +155,8 @@ export function Dashboard() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        {/* Left Column: Stats & Packages */}
+        {/* Left Column: Account actions */}
         <div className="space-y-8">
-          <Card className="bg-stone-900 text-white border-none">
-            <CardHeader>
-              <CardTitle className="text-xl">Your Credits</CardTitle>
-              <CardDescription className="text-stone-400">Available lesson credits</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-baseline gap-2">
-                <span className="text-5xl font-extrabold">{studentData?.creditsRemaining || 0}</span>
-                <span className="text-stone-400 font-medium">lessons</span>
-              </div>
-              <Button 
-                variant="outline" 
-                className="w-full mt-6 border-stone-700 text-stone-900 hover:bg-stone-100"
-                onClick={() => navigate('/pricing')}
-              >
-                Get a Subscription
-              </Button>
-            </CardContent>
-          </Card>
-
           <Card className="border-red-200">
             <CardHeader>
               <CardTitle className="text-red-700">Account Management</CardTitle>
@@ -311,62 +190,19 @@ export function Dashboard() {
           </Card>
         </div>
 
-        {/* Right Column: Lessons & Purchases */}
+        {/* Right Column: Purchase history */}
         <div className="md:col-span-2 space-y-8">
-          <Card>
+          <Card id="purchase-history" className="scroll-mt-28">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Package className="w-5 h-5 text-[#b9d9a1]" />
-                Your Lessons
+                Purchase History
               </CardTitle>
-              <CardDescription>Your current term package and remaining lessons</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {latest ? (
-                <div className="p-5 rounded-lg border border-stone-200 bg-stone-50">
-                  <div className="font-semibold text-stone-900">{latest.planName}</div>
-                  {latestTermInfo && (
-                    <div className="text-sm text-stone-600 mt-1">
-                      {latestTermInfo.termName} &middot; {latestTermInfo.weeks} &middot; {latestTermInfo.dates}
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2 text-sm text-stone-500 mt-1">
-                    <Calendar className="w-4 h-4" />
-                    Purchased {format(new Date(latest.purchasedAt), 'MMMM do, yyyy')}
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-5">
-                    <div>
-                      <div className="text-sm text-stone-500">Lessons Purchased</div>
-                      <div className="text-2xl font-bold text-stone-900">{latest.credits}</div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-stone-500">Lessons Remaining</div>
-                      <div className="text-2xl font-bold text-stone-900">{studentData?.creditsRemaining || 0}</div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-stone-500">Amount Paid</div>
-                      <div className="text-2xl font-bold text-stone-900">
-                        {latest.amountTotal != null ? formatPrice(latest.amountTotal) : '—'}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-10 text-stone-500">
-                  <Music className="w-12 h-12 mx-auto mb-3 text-stone-300" />
-                  <p className="mb-4">You haven't purchased any lessons yet.</p>
-                  <Button className="bg-[#b9d9a1] text-stone-900 hover:bg-[#a5c58d]" onClick={() => navigate('/pricing')}>
-                    View Pricing
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Purchase History</CardTitle>
-              <CardDescription>Your previous lesson purchases</CardDescription>
+              <CardDescription>
+                {sortedHistory.length > 0
+                  ? `${sortedHistory.length} ${sortedHistory.length === 1 ? 'purchase' : 'purchases'} on your account`
+                  : 'Your lesson package purchases will appear here'}
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {sortedHistory.length > 0 ? (
@@ -374,29 +210,69 @@ export function Dashboard() {
                   {sortedHistory.map((entry, index) => {
                     const termInfo = findTermInfo(entry.packageId);
                     return (
-                      <div key={entry.sessionId || index} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-lg border border-stone-100">
-                        <div className="space-y-1">
-                          <div className="font-medium text-stone-900">{entry.planName}</div>
-                          {termInfo && (
-                            <div className="text-sm text-stone-500">
-                              {termInfo.termName} &middot; {termInfo.weeks} &middot; {termInfo.dates}
+                      <div
+                        key={entry.sessionId || index}
+                        className="rounded-xl border border-stone-200 p-5 transition-colors hover:border-stone-300"
+                      >
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="space-y-1">
+                            <div className="font-semibold text-stone-900">
+                              {entry.planName || entry.packageId}
                             </div>
-                          )}
+                            {termInfo && (
+                              <div className="text-sm text-stone-500">
+                                {termInfo.termName} &middot; {termInfo.weeks} &middot; {termInfo.dates}
+                              </div>
+                            )}
+                            <div className="flex items-center gap-1.5 text-sm text-stone-500">
+                              <Calendar className="h-3.5 w-3.5" aria-hidden="true" />
+                              {entry.purchasedAt
+                                ? format(new Date(entry.purchasedAt), 'd MMMM yyyy')
+                                : 'Date unavailable'}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3 sm:flex-col sm:items-end sm:gap-1.5">
+                            <span className="text-lg font-bold text-stone-900">
+                              {entry.amountTotal != null ? formatPrice(entry.amountTotal) : '—'}
+                            </span>
+                            {/* Entries are only ever written by the Stripe webhook
+                                after checkout.session.completed, so anything
+                                present here is a settled payment. */}
+                            <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-800">
+                              <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+                              Paid
+                            </span>
+                          </div>
                         </div>
-                        <div className="mt-2 sm:mt-0 flex items-center gap-4 text-sm">
-                          <span className="text-stone-500">{format(new Date(entry.purchasedAt), 'MMM do, yyyy')}</span>
-                          <span className="text-stone-700 font-medium">{entry.credits} lessons</span>
-                          <span className="font-semibold text-stone-900">
-                            {entry.amountTotal != null ? formatPrice(entry.amountTotal) : '—'}
+
+                        <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-stone-100 pt-3 text-sm">
+                          <span className="text-stone-600">
+                            <span className="font-medium text-stone-900">{entry.credits ?? '—'}</span> lessons
                           </span>
+                          {entry.sessionId && (
+                            <span className="font-mono text-xs text-stone-400 break-all">
+                              Ref: {entry.sessionId.slice(0, 24)}…
+                            </span>
+                          )}
                         </div>
                       </div>
                     );
                   })}
                 </div>
               ) : (
-                <div className="text-center py-6 text-stone-500 text-sm">
-                  No purchases yet.
+                <div className="py-12 text-center text-stone-500">
+                  <Music className="mx-auto mb-3 h-12 w-12 text-stone-300" aria-hidden="true" />
+                  <p className="mb-1 font-medium text-stone-700">No purchases yet</p>
+                  <p className="mb-5 text-sm">
+                    Once you book a lesson package it will show up here with your receipt details.
+                  </p>
+                  <Button
+                    className="bg-[#b9d9a1] text-stone-900 hover:bg-[#a5c58d]"
+                    onClick={() => navigate('/pricing')}
+                  >
+                    View Packages
+                  </Button>
                 </div>
               )}
             </CardContent>
