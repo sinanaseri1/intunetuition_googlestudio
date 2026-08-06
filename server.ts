@@ -282,8 +282,8 @@ async function startServer() {
           },
         ],
         mode: "payment",
-        success_url: `${appUrl}/dashboard?session_id={CHECKOUT_SESSION_ID}&success=true`,
-        cancel_url: `${appUrl}/dashboard?canceled=true`,
+        success_url: `${appUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}&success=true`,
+        cancel_url: `${appUrl}/checkout/cancel?canceled=true`,
         metadata: {
           studentId,
           packageId: resolvedPackage.packageId,
@@ -334,8 +334,8 @@ async function startServer() {
           },
         ],
         mode: "subscription",
-        success_url: `${appUrl}/dashboard?session_id={CHECKOUT_SESSION_ID}&subscription_success=true`,
-        cancel_url: `${appUrl}/dashboard?canceled=true`,
+        success_url: `${appUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}&subscription_success=true`,
+        cancel_url: `${appUrl}/checkout/cancel?canceled=true`,
         metadata: {
           studentId,
           planName: planName || "",

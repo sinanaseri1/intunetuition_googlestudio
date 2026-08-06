@@ -24,6 +24,8 @@ import { MyData } from './pages/MyData';
 import { EditProfile } from './pages/EditProfile';
 import { DeleteAccount } from './pages/DeleteAccount';
 import { ConsentFlow } from './pages/ConsentFlow';
+import { CheckoutSuccess } from './pages/CheckoutSuccess';
+import { CheckoutCancel } from './pages/CheckoutCancel';
 
 function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode, allowedRoles?: string[] }) {
   const { user, profile, loading, profileError, reloadProfile } = useAuth();
@@ -82,6 +84,11 @@ export default function App() {
             <Route path="edit-profile" element={<EditProfile />} />
             <Route path="delete-account" element={<DeleteAccount />} />
             <Route path="consent" element={<ConsentFlow />} />
+            {/* Stripe return targets. Not role-guarded: the redirect happens
+                before the app can re-establish state, and the success page
+                reveals nothing that isn't already the buyer's own purchase. */}
+            <Route path="checkout/success" element={<CheckoutSuccess />} />
+            <Route path="checkout/cancel" element={<CheckoutCancel />} />
             
             <Route path="dashboard" element={
               <ProtectedRoute allowedRoles={['student']}>
