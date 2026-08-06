@@ -6,6 +6,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from './ui
 import { Menu, Instagram } from 'lucide-react';
 import { Logo } from './Logo';
 import { CookieConsent } from './CookieConsent';
+import { Toaster } from './ui/sonner';
 
 export function Layout() {
   const { user, profile, logout } = useAuth();
@@ -171,6 +172,10 @@ export function Layout() {
         </div>
       </footer>
       <CookieConsent />
+      {/* Mounted once here so toast() works app-wide. Without this, every
+          toast.success/info/warning call silently renders nothing — which is
+          why the contact form's "message sent" confirmation never appeared. */}
+      <Toaster position="top-center" richColors closeButton />
     </div>
   );
 }
