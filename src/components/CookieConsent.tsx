@@ -39,7 +39,7 @@ export function CookieConsent() {
             onClick={handleReject} 
             variant="outline" 
             size="sm"
-            className="text-white border-white hover:bg-white hover:text-stone-900"
+            className="text-stone-900 border-white hover:bg-white hover:text-stone-900"
           >
             Reject
           </Button>
